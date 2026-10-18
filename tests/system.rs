@@ -109,7 +109,9 @@ async fn judge(
     if m.behavior.load(Ordering::Relaxed) == 22 {
         return (
             StatusCode::TOO_MANY_REQUESTS,
-            Json(json!({"error":"private rate limit details"})),
+            Json(
+                json!({"error":{"metadata":{"limit_source":"openrouter_key_limit"},"message":"private rate limit details"}}),
+            ),
         );
     }
     if m.behavior.load(Ordering::Relaxed) == 3 {
@@ -169,6 +171,33 @@ async fn judge(
         ),
     )
 }
+fn rate_response(behavior: usize) -> axum::response::Response {
+    if behavior == 36 {
+        return (
+            StatusCode::TOO_MANY_REQUESTS,
+            "malformed private provider response",
+        )
+            .into_response();
+    }
+    let metadata = if behavior == 33 {
+        json!({})
+    } else {
+        json!({"provider_name":"fixture-provider","raw":"PRIVATE_PROVIDER_DETAILS"})
+    };
+    let mut r = (
+        StatusCode::TOO_MANY_REQUESTS,
+        Json(json!({"error":{"code":429,"message":"private error","metadata":metadata}})),
+    )
+        .into_response();
+    let retry = if behavior == 35 {
+        httpdate::fmt_http_date(std::time::SystemTime::now() + std::time::Duration::from_secs(3600))
+    } else {
+        "120".into()
+    };
+    r.headers_mut()
+        .insert("retry-after", retry.parse().unwrap());
+    r
+}
 async fn generate(State(m): State<Arc<Mock>>, Json(v): Json<Value>) -> axum::response::Response {
     if v["response_format"]["json_schema"]["name"] == "jev_answer_review" {
         let behavior = m.behavior.load(Ordering::Relaxed);
@@ -196,9 +225,35 @@ async fn generate(State(m): State<Arc<Mock>>, Json(v): Json<Value>) -> axum::res
     if m.behavior.load(Ordering::Relaxed) == 23 {
         return (
             StatusCode::TOO_MANY_REQUESTS,
-            Json(json!({"error":"private rate limit details"})),
+            Json(json!({"error":{"code":429,"metadata":{"limit_source":"openrouter_key_limit"},"message":"private rate limit details"}})),
         )
             .into_response();
+    }
+    let behavior = m.behavior.load(Ordering::Relaxed);
+    if behavior == 38 {
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    }
+    if behavior == 39 {
+        return (
+            StatusCode::PAYMENT_REQUIRED,
+            Json(json!({"error":"private credit details"})),
+        )
+            .into_response();
+    }
+    if behavior == 40 && v["model"] == "vendor/cheap" {
+        return rate_response(32);
+    }
+    if behavior == 40 && v["model"] == "vendor/strong" {
+        return (StatusCode::NOT_FOUND, Json(json!({"error":"no endpoint"}))).into_response();
+    }
+    if behavior == 42 && v["model"] == "vendor/mid" {
+        return rate_response(32);
+    }
+    if behavior == 41 && v["model"] == "vendor/strong" {
+        return rate_response(32);
+    }
+    if (matches!(behavior, 32 | 33 | 35 | 36) && v["model"] == "vendor/cheap") || behavior == 34 {
+        return rate_response(behavior);
     }
     if m.behavior.load(Ordering::Relaxed) == 5 && v["model"] == "vendor/cheap" {
         return (StatusCode::NOT_FOUND, Json(json!({"error":"no endpoint"}))).into_response();
@@ -219,7 +274,7 @@ async fn generate(State(m): State<Arc<Mock>>, Json(v): Json<Value>) -> axum::res
     let message = if v.get("tools").is_some() {
         json!({"role":"assistant","content":null,"tool_calls":[{"id":"call_1","type":"function","function":{"name":"get_weather","arguments":"{}"}}]})
     } else {
-        json!({"role":"assistant","content":if m.behavior.load(Ordering::Relaxed)==18{if generation==0{"The total is ₹220."}else{"The total is ₹270."}}else if [12,15,16].contains(&m.behavior.load(Ordering::Relaxed)){if generation==0{"₹220"}else{"₹270"}}else{"PONG"}})
+        json!({"role":"assistant","content":if m.behavior.load(Ordering::Relaxed)==18 || m.behavior.load(Ordering::Relaxed)==42{if generation==0{"The total is ₹220."}else{"The total is ₹270."}}else if [12,15,16].contains(&m.behavior.load(Ordering::Relaxed)){if generation==0{"₹220"}else{"₹270"}}else{"PONG"}})
     };
     let mut output = json!({"id":"gen-test","model":v["model"],"choices":[{"index":0,"message":message,"finish_reason":"stop"}],"usage":{"prompt_tokens":100,"completion_tokens":10,"total_tokens":110,"cost":0.0001}});
     if m.behavior.load(Ordering::Relaxed) == 15 && generation > 0 {
@@ -229,7 +284,10 @@ async fn generate(State(m): State<Arc<Mock>>, Json(v): Json<Value>) -> axum::res
         output["usage"].as_object_mut().unwrap().remove("cost");
     }
     let behavior = m.behavior.load(Ordering::Relaxed);
-    if behavior == 25 || ([24, 28, 29].contains(&behavior) && generation == 0) {
+    if behavior == 25
+        || ([24, 28, 29].contains(&behavior) && generation == 0)
+        || (behavior == 41 && v["model"] == "vendor/cheap")
+    {
         output["choices"][0]["message"] = json!({"role":"assistant","content":null,"reasoning":"PRIVATE_REASONING_MUST_NOT_BE_RETAINED"});
         output["choices"][0]["finish_reason"] = json!("length");
         output["usage"]["completion_tokens_details"] = json!({"reasoning_tokens":512});
@@ -251,31 +309,37 @@ async fn generate(State(m): State<Arc<Mock>>, Json(v): Json<Value>) -> axum::res
     }
     Json(output).into_response()
 }
-async fn responses(State(m): State<Arc<Mock>>, Json(v): Json<Value>) -> Json<Value> {
+async fn responses(State(m): State<Arc<Mock>>, Json(v): Json<Value>) -> axum::response::Response {
     m.requests.lock().unwrap().push(v.clone());
+    if m.behavior.load(Ordering::Relaxed) == 32 && v["model"] == "vendor/cheap" {
+        return rate_response(32);
+    }
     if m.behavior.load(Ordering::Relaxed) == 27
         && m.generations.fetch_add(1, Ordering::Relaxed) == 0
     {
         return Json(
             json!({"id":"reasoning-only","model":v["model"],"status":"incomplete","output":[{"type":"reasoning","summary":[]}],"usage":{"cost":0.0001}}),
-        );
+        ).into_response();
     }
     Json(
         json!({"id":"resp-test","model":v["model"],"output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"PONG"}]}],"usage":{"cost":0.0001}}),
-    )
+    ).into_response()
 }
-async fn messages(State(m): State<Arc<Mock>>, Json(v): Json<Value>) -> Json<Value> {
+async fn messages(State(m): State<Arc<Mock>>, Json(v): Json<Value>) -> axum::response::Response {
     m.requests.lock().unwrap().push(v.clone());
+    if m.behavior.load(Ordering::Relaxed) == 32 && v["model"] == "vendor/cheap" {
+        return rate_response(32);
+    }
     if m.behavior.load(Ordering::Relaxed) == 27
         && m.generations.fetch_add(1, Ordering::Relaxed) == 0
     {
         return Json(
             json!({"id":"thinking-only","model":v["model"],"stop_reason":"max_tokens","content":[{"type":"thinking","thinking":"PRIVATE_REASONING"}],"usage":{"cost":0.0001}}),
-        );
+        ).into_response();
     }
     Json(
         json!({"id":"msg-test","type":"message","model":v["model"],"role":"assistant","content":[{"type":"text","text":"PONG"}],"usage":{"cost":0.0001}}),
-    )
+    ).into_response()
 }
 async fn setup(mut cfg: Config) -> System {
     let mock = Arc::new(Mock::default());
@@ -362,7 +426,7 @@ async fn routing_rate_limit_is_explicit_and_never_calls_generation() {
     assert_eq!(s.mock.generations.load(Ordering::Relaxed), 0);
 }
 #[tokio::test]
-async fn generation_rate_limit_is_explicit_and_is_not_retried() {
+async fn account_rate_limit_is_explicit_and_is_not_retried() {
     let s = setup(public()).await;
     s.mock.behavior.store(23, Ordering::Relaxed);
     let r = send(&s, request(), "key-a", "/v1/chat/completions").await;
@@ -1919,4 +1983,424 @@ async fn recovery_disables_reasoning_when_the_fallback_explicitly_supports_it() 
     assert_eq!(requests[1]["reasoning"]["effort"], "none");
     assert_eq!(requests[1]["reasoning"]["enabled"], false);
     assert_eq!(requests[1]["max_tokens"], 512);
+}
+
+async fn settled_record(s: &System, id: &str, key: &str) -> Value {
+    let tenant = Credential::new(key.into()).unwrap().tenant();
+    for _ in 0..100 {
+        let r = s.store.request(&tenant, id).await.unwrap();
+        if r["status"] != "pending" {
+            return r;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    panic!("Reservation did not settle");
+}
+#[tokio::test]
+async fn provider_rate_limit_fails_over_within_policy_and_records_the_rejection() {
+    let s = setup(public()).await;
+    s.mock.behavior.store(32, Ordering::Relaxed);
+    let r = send(&s, request(), "key-a", "/v1/chat/completions").await;
+    assert_eq!(r.status(), 200);
+    assert_eq!(r.headers()["x-jev-model"], "vendor/strong");
+    assert_eq!(r.headers()["x-jev-reason"], "rate_limit_fallback");
+    let id = r.headers()["x-request-id"].to_str().unwrap().to_owned();
+    assert_eq!(
+        r.json::<Value>().await.unwrap()["choices"][0]["message"]["content"],
+        "PONG"
+    );
+    assert_eq!(s.mock.generations.load(Ordering::Relaxed), 2);
+    let record = settled_record(&s, &id, "key-a").await;
+    let rejected = &record["routing"]["upstream_rejections"][0];
+    assert_eq!(rejected["model"], "vendor/cheap");
+    assert_eq!(rejected["rate_limit_scope"], "provider");
+    assert_eq!(rejected["retry_after_seconds"], 120);
+    assert_eq!(rejected["failover"], true);
+    assert_eq!(record["routing"]["confidence"], 0.0);
+    assert!(!record.to_string().contains("PRIVATE_PROVIDER_DETAILS"));
+    let jev = record["routing"]["jev_cost"].as_f64().unwrap();
+    assert!((record["cost_usd"].as_f64().unwrap() - jev - 0.0001).abs() < 1e-10);
+    assert_eq!(
+        record["routing"]["generation_attempts"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+}
+#[tokio::test]
+async fn rejected_model_cools_down_only_for_its_tenant() {
+    let s = setup(public()).await;
+    s.mock.behavior.store(32, Ordering::Relaxed);
+    for key in ["key-a", "key-a", "key-b"] {
+        let r = send(&s, request(), key, "/v1/chat/completions").await;
+        assert_eq!(r.status(), 200);
+        let _ = r.text().await;
+    }
+    let requests = s.mock.requests.lock().unwrap();
+    assert_eq!(
+        requests
+            .iter()
+            .filter(|v| v["model"] == "vendor/cheap")
+            .count(),
+        2
+    );
+    assert_eq!(requests[2]["model"], "vendor/mid");
+}
+#[tokio::test]
+async fn unknown_and_malformed_pre_output_429s_have_bounded_fallback() {
+    for behavior in [33, 36] {
+        let s = setup(public()).await;
+        s.mock.behavior.store(behavior, Ordering::Relaxed);
+        let r = send(&s, request(), "key-a", "/v1/chat/completions").await;
+        assert_eq!(r.status(), 200);
+        assert_eq!(s.mock.generations.load(Ordering::Relaxed), 2);
+    }
+}
+#[tokio::test]
+async fn all_rejected_generators_stop_at_the_configured_attempt_bound() {
+    let cfg = Config {
+        repair_model: "vendor/mid".into(),
+        ..public()
+    };
+    let s = setup(cfg).await;
+    s.mock.behavior.store(34, Ordering::Relaxed);
+    let r = send(&s, request(), "key-a", "/v1/chat/completions").await;
+    assert_eq!(r.status(), 429);
+    assert_eq!(r.headers()["retry-after"], "120");
+    let id = r.headers()["x-request-id"].to_str().unwrap().to_owned();
+    let _ = r.text().await;
+    assert_eq!(s.mock.generations.load(Ordering::Relaxed), 3);
+    let record = settled_record(&s, &id, "key-a").await;
+    assert_eq!(
+        record["routing"]["upstream_rejections"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3
+    );
+    let tenant = Credential::new("key-a".into()).unwrap().tenant();
+    assert_eq!(s.store.usage(&tenant).await.unwrap()["active"], 0);
+    let judges = s.mock.judgements.load(Ordering::Relaxed);
+    let r = send(&s, request(), "key-a", "/v1/chat/completions").await;
+    assert_eq!(r.status(), 503);
+    assert_eq!(
+        r.json::<Value>().await.unwrap()["error"]["code"],
+        "no_healthy_model"
+    );
+    assert_eq!(s.mock.judgements.load(Ordering::Relaxed), judges);
+}
+#[tokio::test]
+async fn rate_limit_fallback_cannot_restore_a_hard_excluded_model() {
+    let cfg = Config {
+        hard_allowed_models: vec!["vendor/cheap".into()],
+        ..public()
+    };
+    let s = setup(cfg).await;
+    s.mock.behavior.store(32, Ordering::Relaxed);
+    let r = send(&s, request(), "key-a", "/v1/chat/completions").await;
+    assert_eq!(r.status(), 429);
+    assert_eq!(s.mock.generations.load(Ordering::Relaxed), 1);
+}
+#[tokio::test]
+async fn unavailable_soft_include_can_relax_after_a_definite_rejection() {
+    let s = setup(public()).await;
+    s.mock.behavior.store(32, Ordering::Relaxed);
+    let mut v = request();
+    v["plugins"] =
+        json!([{"id":"jev-router","models":["vendor/cheap"],"excluded_models":["vendor/mid"]}]);
+    let r = send(&s, v, "key-a", "/v1/chat/completions").await;
+    assert_eq!(r.status(), 200);
+    assert_eq!(r.headers()["x-jev-model"], "vendor/strong");
+    let id = r.headers()["x-request-id"].to_str().unwrap().to_owned();
+    let _ = r.text().await;
+    let record = settled_record(&s, &id, "key-a").await;
+    assert_eq!(record["routing"]["list_fallback"], "models_ignored");
+    assert_eq!(record["routing"]["excluded_models"], json!(["vendor/mid"]));
+}
+#[tokio::test]
+async fn bound_sessions_do_not_switch_models_on_rate_limits() {
+    let s = setup(public()).await;
+    s.mock.behavior.store(32, Ordering::Relaxed);
+    let tenant = Credential::new("key-a".into()).unwrap().tenant();
+    s.store
+        .bind_session(&tenant, "bound-rate", "vendor/cheap", "low")
+        .await
+        .unwrap();
+    let mut v = request();
+    v["session_id"] = json!("bound-rate");
+    v["messages"] = json!([{"role":"tool","tool_call_id":"call_1","content":"result"}]);
+    let r = send(&s, v, "key-a", "/v1/chat/completions").await;
+    assert_eq!(r.status(), 429);
+    assert_eq!(s.mock.generations.load(Ordering::Relaxed), 1);
+    assert_eq!(
+        s.store
+            .session(&tenant, "bound-rate", 3600)
+            .await
+            .unwrap()
+            .unwrap()
+            .0,
+        "vendor/cheap"
+    );
+}
+#[tokio::test]
+async fn native_sse_can_fail_over_before_any_stream_is_forwarded() {
+    let s = setup(public()).await;
+    s.mock.behavior.store(32, Ordering::Relaxed);
+    let mut v = request();
+    v["stream"] = json!(true);
+    let r = send(&s, v, "key-a", "/v1/chat/completions").await;
+    assert_eq!(r.status(), 200);
+    assert_eq!(r.headers()["x-jev-model"], "vendor/strong");
+    assert!(r.text().await.unwrap().contains("PONG"));
+    assert_eq!(s.mock.generations.load(Ordering::Relaxed), 2);
+}
+#[tokio::test]
+async fn responses_and_messages_use_the_same_pre_output_rate_limit_fallback() {
+    for (path, body) in [
+        (
+            "/v1/responses",
+            json!({"input":"Reply PONG","max_output_tokens":512}),
+        ),
+        (
+            "/v1/messages",
+            json!({"messages":[{"role":"user","content":"Reply PONG"}],"max_tokens":512}),
+        ),
+    ] {
+        let s = setup(public()).await;
+        s.mock.behavior.store(32, Ordering::Relaxed);
+        let r = send(&s, body, "key-a", path).await;
+        assert_eq!(r.status(), 200);
+        assert_eq!(r.headers()["x-jev-model"], "vendor/strong");
+        assert!(r.text().await.unwrap().contains("PONG"));
+        assert_eq!(s.mock.requests.lock().unwrap().len(), 2);
+    }
+}
+#[tokio::test]
+async fn retry_after_http_date_is_sanitized_and_preserved() {
+    let cfg = Config {
+        hard_allowed_models: vec!["vendor/cheap".into()],
+        ..public()
+    };
+    let s = setup(cfg).await;
+    s.mock.behavior.store(35, Ordering::Relaxed);
+    let r = send(&s, request(), "key-a", "/v1/chat/completions").await;
+    assert_eq!(r.status(), 429);
+    let retry = r.headers()["retry-after"]
+        .to_str()
+        .unwrap()
+        .parse::<u64>()
+        .unwrap();
+    assert!((3590..=3600).contains(&retry));
+    let b = r.json::<Value>().await.unwrap();
+    assert_eq!(b["error"]["rate_limit_scope"], "provider");
+    assert!(!b.to_string().contains("PRIVATE_PROVIDER_DETAILS"));
+}
+#[tokio::test]
+async fn operator_can_disable_rejection_failover() {
+    let cfg = Config {
+        max_generation_failovers: 0,
+        ..public()
+    };
+    let s = setup(cfg).await;
+    s.mock.behavior.store(32, Ordering::Relaxed);
+    assert_eq!(
+        send(&s, request(), "key-a", "/v1/chat/completions")
+            .await
+            .status(),
+        429
+    );
+    assert_eq!(s.mock.generations.load(Ordering::Relaxed), 1);
+}
+#[test]
+fn provider_fallback_preserves_privacy_prices_and_explicit_opt_out() {
+    let cfg = Config {
+        zdr: true,
+        provider_only: vec!["allowed-provider".into()],
+        ..public()
+    };
+    for opt_out in [false, true] {
+        let mut v = request();
+        v["provider"] = json!({"only":["allowed-provider","other"],"max_price":{"prompt":0.5,"completion":0.8}});
+        if opt_out {
+            v["provider"]["allow_fallbacks"] = json!(false);
+        }
+        let task = policy::parse(v, Protocol::Chat, &cfg).unwrap();
+        let p = policy::provider(&task, &cfg, &model("vendor/cheap")).unwrap();
+        assert_eq!(p["only"], json!(["allowed-provider"]));
+        assert_eq!(p["data_collection"], "deny");
+        assert_eq!(p["zdr"], true);
+        assert_eq!(p["max_price"], json!({"prompt":0.5,"completion":0.8}));
+        assert_eq!(p["allow_fallbacks"], !opt_out);
+    }
+}
+#[test]
+fn generation_failover_configuration_is_bounded() {
+    assert!(
+        Config {
+            max_generation_failovers: 5,
+            ..Config::default()
+        }
+        .validate()
+        .is_err()
+    );
+    assert!(
+        Config {
+            max_generation_failovers: 0,
+            ..Config::default()
+        }
+        .validate()
+        .is_ok()
+    );
+}
+
+#[tokio::test]
+async fn generation_timeout_is_never_replayed() {
+    let s = setup(Config {
+        request_timeout_secs: 1,
+        ..public()
+    })
+    .await;
+    s.mock.behavior.store(38, Ordering::Relaxed);
+    let r = send(&s, request(), "key-a", "/v1/chat/completions").await;
+    assert_eq!(r.status(), 504);
+    assert_eq!(s.mock.generations.load(Ordering::Relaxed), 1);
+}
+#[tokio::test]
+async fn account_credits_cannot_trigger_model_hopping() {
+    let s = setup(public()).await;
+    s.mock.behavior.store(39, Ordering::Relaxed);
+    let r = send(&s, request(), "key-a", "/v1/chat/completions").await;
+    assert_eq!(r.status(), 402);
+    assert_eq!(
+        r.json::<Value>().await.unwrap()["error"]["code"],
+        "upstream_credits"
+    );
+    assert_eq!(s.mock.generations.load(Ordering::Relaxed), 1);
+}
+#[tokio::test]
+async fn non_boolean_provider_fallback_control_fails_before_paid_work() {
+    let s = setup(public()).await;
+    let mut v = request();
+    v["provider"] = json!({"allow_fallbacks":"no"});
+    assert_eq!(
+        send(&s, v, "key-a", "/v1/chat/completions").await.status(),
+        400
+    );
+    assert_eq!(s.mock.judgements.load(Ordering::Relaxed), 0);
+    assert_eq!(s.mock.generations.load(Ordering::Relaxed), 0);
+}
+
+#[tokio::test]
+async fn rate_limit_then_missing_endpoint_rebuilds_without_reselecting_the_cooled_model() {
+    let s = setup(Config {
+        repair_model: "vendor/mid".into(),
+        ..public()
+    })
+    .await;
+    s.mock.behavior.store(40, Ordering::Relaxed);
+    let r = send(&s, request(), "key-a", "/v1/chat/completions").await;
+    assert_eq!(r.status(), 200);
+    assert_eq!(r.headers()["x-jev-model"], "vendor/mid");
+    assert_eq!(s.mock.generations.load(Ordering::Relaxed), 3);
+    let requests = s.mock.requests.lock().unwrap();
+    assert_eq!(
+        requests
+            .iter()
+            .filter(|v| v["model"] == "vendor/cheap")
+            .count(),
+        1
+    );
+}
+#[tokio::test]
+async fn empty_output_recovery_can_fail_over_a_rejected_request_without_a_third_generation() {
+    let s = setup(Config {
+        repair_model: "vendor/mid".into(),
+        ..public()
+    })
+    .await;
+    s.mock.behavior.store(41, Ordering::Relaxed);
+    let r = send(&s, request(), "key-a", "/v1/chat/completions").await;
+    assert_eq!(r.status(), 200);
+    assert_eq!(r.headers()["x-jev-model"], "vendor/mid");
+    let id = r.headers()["x-request-id"].to_str().unwrap().to_owned();
+    let _ = r.text().await;
+    let record = settled_record(&s, &id, "key-a").await;
+    assert_eq!(
+        record["routing"]["generation_attempts"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(
+        record["routing"]["upstream_rejections"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        record["routing"]["generation_attempts"][0]["model"],
+        "vendor/cheap"
+    );
+    let jev = record["routing"]["jev_cost"].as_f64().unwrap();
+    assert!((record["cost_usd"].as_f64().unwrap() - jev - 0.0002).abs() < 1e-10);
+}
+
+#[tokio::test]
+async fn deterministic_answer_repair_can_fail_over_a_rate_limited_repair_model() {
+    let s = setup(Config {
+        repair_model: "vendor/mid".into(),
+        ..public()
+    })
+    .await;
+    s.mock.behavior.store(42, Ordering::Relaxed);
+    let mut v = request();
+    v["messages"] = json!([{"role":"user","content":"What is the total for 6 items at ₹20 each and 10 items at ₹15 each?"}]);
+    let r = send(&s, v, "key-a", "/v1/chat/completions").await;
+    assert_eq!(r.status(), 200);
+    assert_eq!(r.headers()["x-jev-model"], "vendor/strong");
+    let id = r.headers()["x-request-id"].to_str().unwrap().to_owned();
+    assert!(r.text().await.unwrap().contains("270"));
+    let record = settled_record(&s, &id, "key-a").await;
+    assert_eq!(record["routing"]["answer_review"]["status"], "repaired");
+    assert_eq!(
+        record["routing"]["generation_attempts"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(
+        record["routing"]["upstream_rejections"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(s.mock.generations.load(Ordering::Relaxed), 3);
+}
+#[tokio::test]
+async fn rate_limit_failover_uses_an_eligible_peer_under_an_operator_allowlist() {
+    // Configured fallback/repair/recovery models are outside the allowlist.
+    let cfg = Config {
+        hard_allowed_models: vec!["vendor/cheap".into(), "vendor/mid".into()],
+        ..public()
+    };
+    let s = setup(cfg).await;
+    s.mock.behavior.store(32, Ordering::Relaxed);
+    let r = send(&s, request(), "key-a", "/v1/chat/completions").await;
+    assert_eq!(r.status(), 200);
+    assert_eq!(r.headers()["x-jev-model"], "vendor/mid");
+    assert_eq!(r.headers()["x-jev-reason"], "rate_limit_fallback");
+    let _ = r.text().await;
+    let requests = s.mock.requests.lock().unwrap();
+    assert_eq!(requests.len(), 2);
+    assert_eq!(requests[0]["model"], "vendor/cheap");
+    // A rate limit is not an output-budget failure: reasoning effort is preserved.
+    assert_eq!(
+        requests[1]["reasoning"]["effort"],
+        requests[0]["reasoning"]["effort"]
+    );
 }

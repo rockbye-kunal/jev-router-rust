@@ -14,6 +14,8 @@
   "fallback_model": "anthropic/claude-sonnet-4.6",
   "repair_model": "google/gemini-3-flash-preview",
   "output_recovery_model": "openai/gpt-5.4",
+  "allow_provider_fallbacks": true,
+  "max_generation_failovers": 2,
   "verify_text_answers": true,
   "model_answer_review": false,
   "jev_model": "typesafe/jev-1.13",

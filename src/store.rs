@@ -231,6 +231,9 @@ pub struct Reservation {
     checkpoint: Value,
 }
 impl Reservation {
+    pub(crate) fn diagnostics(&self) -> Value {
+        self.checkpoint.clone()
+    }
     /// Persist routing diagnostics before paid work, without storing request content.
     pub async fn checkpoint(&mut self, metadata: &Value) -> Result<()> {
         sqlx::query("UPDATE requests SET metadata=? WHERE id=? AND status='pending'")

@@ -10,7 +10,9 @@ pub struct Error {
     pub status: StatusCode,
     pub code: &'static str,
     pub message: String,
-    pub routing: Option<(String, String, String)>,
+    pub routing: Option<Box<(String, String, String)>>,
+    pub rate_limit_scope: Option<&'static str>,
+    pub retry_after_secs: Option<u64>,
 }
 impl Error {
     pub fn new(status: u16, code: &'static str, message: impl Into<String>) -> Self {
@@ -19,13 +21,15 @@ impl Error {
             code,
             message: message.into(),
             routing: None,
+            rate_limit_scope: None,
+            retry_after_secs: None,
         }
     }
     pub fn bad(message: impl Into<String>) -> Self {
         Self::new(400, "invalid_request", message)
     }
     pub fn with_route(mut self, id: &str, model: &str, effort: &str) -> Self {
-        self.routing = Some((id.into(), model.into(), effort.into()));
+        self.routing = Some(Box::new((id.into(), model.into(), effort.into())));
         self
     }
     pub fn internal(_: impl std::fmt::Display) -> Self {
@@ -36,10 +40,16 @@ impl IntoResponse for Error {
     fn into_response(self) -> Response {
         let mut response = (
             self.status,
-            Json(json!({"error":{"code":self.code,"message":self.message,"request_id":self.routing.as_ref().map(|r|&r.0)}})),
+            Json(json!({"error":{"code":self.code,"message":self.message,"request_id":self.routing.as_ref().map(|r|&r.0),"rate_limit_scope":self.rate_limit_scope,"retry_after_seconds":self.retry_after_secs}})),
         )
             .into_response();
-        if let Some((id, model, effort)) = self.routing {
+        if let Some(seconds) = self.retry_after_secs
+            && let Ok(value) = seconds.to_string().parse()
+        {
+            response.headers_mut().insert("retry-after", value);
+        }
+        if let Some(route) = self.routing {
+            let (id, model, effort) = *route;
             for (name, value) in [
                 ("x-request-id", id),
                 ("x-jev-model", model),

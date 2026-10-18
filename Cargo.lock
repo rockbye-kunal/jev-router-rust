@@ -891,6 +891,7 @@ dependencies = [
  "futures-util",
  "globset",
  "http-body-util",
+ "httpdate",
  "regex",
  "reqwest",
  "serde",

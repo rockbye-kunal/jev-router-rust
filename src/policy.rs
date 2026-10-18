@@ -507,7 +507,12 @@ pub fn provider(task: &Task, cfg: &Config, m: &Model) -> Result<Value> {
     }
     o.insert("max_price".into(), prices);
     o.insert("require_parameters".into(), json!(true));
-    o.insert("allow_fallbacks".into(), json!(false));
+    if o.get("allow_fallbacks").is_some_and(|v| !v.is_boolean()) {
+        return Err(Error::bad("provider.allow_fallbacks must be a boolean"));
+    }
+    let allow_fallbacks =
+        cfg.allow_provider_fallbacks && o.get("allow_fallbacks") != Some(&json!(false));
+    o.insert("allow_fallbacks".into(), json!(allow_fallbacks));
     Ok(p)
 }
 pub fn rewrite(task: &Task, cfg: &Config, model: &Model, selection: &Selection) -> Result<Value> {

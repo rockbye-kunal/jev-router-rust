@@ -30,11 +30,15 @@ impl Credential {
         format!("{:x}", Sha256::digest(self.expose().as_bytes()))
     }
 }
+/// Upper bound on a provider-supplied Retry-After so one header cannot disable a
+/// model for a tenant for hours.
+const MAX_RATE_LIMIT_COOLDOWN_SECS: u64 = 900;
 #[derive(Clone)]
 pub struct Upstream {
     pub client: reqwest::Client,
     pub base: String,
     failures: Arc<Mutex<HashMap<String, (u32, i64)>>>,
+    cooldowns: Arc<Mutex<HashMap<String, i64>>>,
     cooldown: u64,
 }
 impl Upstream {
@@ -48,10 +52,27 @@ impl Upstream {
                 .map_err(Error::internal)?,
             base: c.upstream.trim_end_matches('/').into(),
             failures: Default::default(),
+            cooldowns: Default::default(),
             cooldown: c.circuit_cooldown_secs,
         })
     }
     fn check(&self, id: &str) -> Result<()> {
+        if let Some(until) = self
+            .cooldowns
+            .lock()
+            .map_err(Error::internal)?
+            .get(id)
+            .copied()
+            && until > now()
+        {
+            let mut error = Error::new(
+                503,
+                "circuit_open",
+                "Model is cooling down after an upstream rate limit",
+            );
+            error.retry_after_secs = Some((until - now()).max(1) as u64);
+            return Err(error);
+        }
         let map = self.failures.lock().map_err(Error::internal)?;
         if map
             .get(id)
@@ -64,6 +85,22 @@ impl Upstream {
             ));
         }
         Ok(())
+    }
+    pub fn model_available(&self, key: &Credential, path: &str, model: &str) -> bool {
+        self.check(&format!("{}:{path}:{model}", key.tenant()))
+            .is_ok()
+    }
+    fn cool_down(&self, id: &str, seconds: u64) {
+        if let Ok(mut map) = self.cooldowns.lock() {
+            map.retain(|_, until| *until > now());
+            // Bound the cache without invalidating existing unexpired cooldowns.
+            if map.len() < 8192 || map.contains_key(id) {
+                map.insert(
+                    id.into(),
+                    now().saturating_add(seconds.min(MAX_RATE_LIMIT_COOLDOWN_SECS) as i64),
+                );
+            }
+        }
     }
     fn outcome(&self, id: &str, success: bool) {
         if let Ok(mut m) = self.failures.lock() {
@@ -141,19 +178,61 @@ impl Upstream {
         };
         let status = response.status().as_u16();
         if !response.status().is_success() {
-            if status == 429 || status >= 500 {
+            if status >= 500 {
                 self.outcome(&id, false);
             }
             if status == 429 {
-                return Err(Error::new(
+                let retry_after = response
+                    .headers()
+                    .get("retry-after")
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|v| {
+                        v.parse::<u64>().ok().or_else(|| {
+                            httpdate::parse_http_date(v).ok().map(|date| {
+                                date.duration_since(std::time::SystemTime::now())
+                                    .unwrap_or_default()
+                                    .as_secs()
+                                    .max(1)
+                            })
+                        })
+                    });
+                // Inspect a bounded error envelope; never forward raw provider messages.
+                let envelope = Self::json(response, 128 * 1024)
+                    .await
+                    .unwrap_or(Value::Null);
+                let metadata = &envelope["error"]["metadata"];
+                let account_limit = metadata["limit_source"]
+                    .as_str()
+                    .is_some_and(|s| s.starts_with("openrouter_"))
+                    || matches!(
+                        metadata["scope"].as_str(),
+                        Some("account" | "api_key" | "workspace" | "key_limit")
+                    );
+                let scope = if account_limit {
+                    "account"
+                } else if metadata["provider_name"]
+                    .as_str()
+                    .is_some_and(|s| !s.is_empty())
+                {
+                    "provider"
+                } else {
+                    "unknown"
+                };
+                if !account_limit {
+                    self.cool_down(&id, retry_after.unwrap_or(self.cooldown).max(self.cooldown));
+                }
+                let mut error = Error::new(
                     429,
                     if path == "/api/alpha/decisions" {
                         "routing_rate_limit"
                     } else {
                         "generation_rate_limit"
                     },
-                    "OpenRouter rate limit reached; paid request not retried",
-                ));
+                    "OpenRouter rejected the request with a rate limit",
+                );
+                error.rate_limit_scope = Some(scope);
+                error.retry_after_secs = retry_after;
+                return Err(error);
             }
             return Err(Self::http_error(status));
         }

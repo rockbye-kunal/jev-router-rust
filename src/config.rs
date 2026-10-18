@@ -26,6 +26,8 @@ pub struct Config {
     pub fallback_model: String,
     pub repair_model: String,
     pub output_recovery_model: String,
+    pub allow_provider_fallbacks: bool,
+    pub max_generation_failovers: usize,
     pub verify_text_answers: bool,
     pub model_answer_review: bool,
     pub hard_allowed_models: Vec<String>,
@@ -63,6 +65,8 @@ impl Default for Config {
             fallback_model: "anthropic/claude-sonnet-4.6".into(),
             repair_model: "google/gemini-3-flash-preview".into(),
             output_recovery_model: "openai/gpt-5.4".into(),
+            allow_provider_fallbacks: true,
+            max_generation_failovers: 2,
             verify_text_answers: true,
             model_answer_review: false,
             hard_allowed_models: vec![],
@@ -95,6 +99,11 @@ impl Config {
         Ok(c)
     }
     pub fn validate(&self) -> Result<()> {
+        if self.max_generation_failovers > 4 {
+            return Err(Error::bad(
+                "At most four generation rejection failovers are allowed",
+            ));
+        }
         let url =
             url::Url::parse(&self.upstream).map_err(|_| Error::bad("Invalid upstream URL"))?;
         let loopback = url

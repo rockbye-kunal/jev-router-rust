@@ -4,7 +4,7 @@ use crate::{
     error::{Error, Result},
     policy::{self, Protocol, Selection, Task},
     registry::{Model, Registry},
-    store::Store,
+    store::{Reservation, Store},
     stream::Inspector,
     upstream::{Credential, Upstream},
 };
@@ -416,6 +416,21 @@ async fn execute(
     broad.plugin.models.clear();
     broad.plugin.allowed_models.clear();
     let (broad_pool, _) = policy::eligible(&broad, &registry, &s.cfg)?;
+    let broad_pool = broad_pool
+        .into_iter()
+        .filter(|m| {
+            previous.is_some()
+                || s.upstream
+                    .model_available(&key, task.protocol.endpoint(), &m.id)
+        })
+        .collect::<Vec<_>>();
+    if broad_pool.is_empty() {
+        return Err(Error::new(
+            503,
+            "no_healthy_model",
+            "All eligible models are temporarily unavailable",
+        ));
+    }
     let broad_pool = s.engine.fit_budget(&task, &broad_pool)?;
     let reviewer = s.engine.reviewer(&broad_pool).cloned();
     let mut pool = preferred
@@ -481,12 +496,25 @@ async fn execute(
             }
         }
     }
-    reservation.checkpoint(&trace).await?;
-    let mut body = policy::rewrite(&task, &s.cfg, &model, &selection)?;
-    if let Some(advice) = advice.as_deref() {
-        insert_advice(&mut body, task.protocol, advice);
+    let mut upstream_rejections = Vec::new();
+    let mut upstream = GenerationContext {
+        app: &s,
+        key: &key,
+        task: &task,
+        pool: &pool,
+        broad_pool: &broad_pool,
+        advice: advice.as_deref(),
+        previous_bound: previous.is_some(),
+        fetched: registry.fetched_at,
+        request_id: &request_id,
     }
-    let mut upstream = s.upstream.post(task.protocol.endpoint(), &key, &body).await;
+    .post(
+        &mut selection,
+        &mut model,
+        &mut reservation,
+        &mut upstream_rejections,
+    )
+    .await;
     // A definite 404 has no usable generation endpoint. Rebuild once, preserving all hard restrictions.
     if upstream
         .as_ref()
@@ -495,8 +523,13 @@ async fn execute(
         && task.body.get("previous_response_id").is_none()
     {
         let next = broad_pool
-            .into_iter()
-            .filter(|m| m.id != model.id)
+            .iter()
+            .filter(|m| {
+                m.id != model.id
+                    && s.upstream
+                        .model_available(&key, task.protocol.endpoint(), &m.id)
+            })
+            .cloned()
             .collect::<Vec<_>>();
         if !next.is_empty() {
             let (mut retry, new_model, _) = s
@@ -508,15 +541,27 @@ async fn execute(
             retry.reason = format!("endpoint_fallback:{}", retry.reason);
             selection = retry;
             model = new_model;
-            body = policy::rewrite(&task, &s.cfg, &model, &selection)?;
-            if let Some(advice) = advice.as_deref() {
-                insert_advice(&mut body, task.protocol, advice);
+            pool = next;
+            upstream = GenerationContext {
+                app: &s,
+                key: &key,
+                task: &task,
+                pool: &pool,
+                broad_pool: &broad_pool,
+                advice: advice.as_deref(),
+                previous_bound: previous.is_some(),
+                fetched: registry.fetched_at,
+                request_id: &request_id,
             }
-            upstream = s.upstream.post(task.protocol.endpoint(), &key, &body).await;
+            .post(
+                &mut selection,
+                &mut model,
+                &mut reservation,
+                &mut upstream_rejections,
+            )
+            .await;
         }
     }
-    trace = metadata(&selection, &task, registry.fetched_at, &request_id);
-    reservation.checkpoint(&trace).await?;
     let upstream =
         upstream.map_err(|e| e.with_route(&request_id, &selection.model, &selection.effort))?;
     trace = metadata(&selection, &task, registry.fetched_at, &request_id);
@@ -524,6 +569,7 @@ async fn execute(
         trace["max_fallback"] = json!("deep");
     }
     trace["routing_elapsed_ms"] = json!(started.elapsed().as_millis());
+    trace["upstream_rejections"] = json!(upstream_rejections);
     if task.stream
         && let Some(id) = &task.session
     {
@@ -609,12 +655,24 @@ async fn execute(
             trace = metadata(&selection, &task, registry.fetched_at, &request_id);
             trace["generation_attempts"] = json!(attempts);
             reservation.checkpoint(&trace).await?;
-            let rewritten = policy::rewrite(&task, &s.cfg, &model, &selection)?;
-            let r = s
-                .upstream
-                .post(task.protocol.endpoint(), &key, &rewritten)
-                .await
-                .map_err(|e| e.with_route(&request_id, &selection.model, &selection.effort))?;
+            let r = GenerationContext {
+                app: &s,
+                key: &key,
+                task: &task,
+                pool: &pool,
+                broad_pool: &broad_pool,
+                advice: None,
+                previous_bound: previous.is_some(),
+                fetched: registry.fetched_at,
+                request_id: &request_id,
+            }
+            .post(
+                &mut selection,
+                &mut model,
+                &mut reservation,
+                &mut upstream_rejections,
+            )
+            .await?;
             body = Upstream::json(r, 16 * 1024 * 1024)
                 .await
                 .map_err(|e| e.with_route(&request_id, &selection.model, &selection.effort))?;
@@ -626,6 +684,8 @@ async fn execute(
                 )
                 .with_route(&request_id, &selection.model, &selection.effort));
             }
+            trace = metadata(&selection, &task, registry.fetched_at, &request_id);
+            trace["upstream_rejections"] = json!(upstream_rejections);
             attempts.push(generation_diagnostic(&body, task.protocol, &selection));
             generation_cost = generation_cost
                 .zip(provider_cost(&body))
@@ -717,14 +777,25 @@ async fn execute(
                     model.efforts.first().cloned().unwrap_or("default".into())
                 };
                 selection.reason = "answer_repaired".into();
-                let mut rewritten = policy::rewrite(&task, &s.cfg, &model, &selection)?;
-                if let Some(c) = &calculation {
-                    insert_advice(&mut rewritten, task.protocol, &c.context());
+                let repair_context = calculation.as_ref().map(|c| c.context());
+                let r = GenerationContext {
+                    app: &s,
+                    key: &key,
+                    task: &task,
+                    pool: &pool,
+                    broad_pool: &broad_pool,
+                    advice: repair_context.as_deref(),
+                    previous_bound: previous.is_some(),
+                    fetched: registry.fetched_at,
+                    request_id: &request_id,
                 }
-                let r = s
-                    .upstream
-                    .post(task.protocol.endpoint(), &key, &rewritten)
-                    .await?;
+                .post(
+                    &mut selection,
+                    &mut model,
+                    &mut reservation,
+                    &mut upstream_rejections,
+                )
+                .await?;
                 body = Upstream::json(r, 16 * 1024 * 1024).await?;
                 if !served_model(&model.id, body["model"].as_str().unwrap_or("")) {
                     return Err(Error::new(
@@ -783,6 +854,7 @@ async fn execute(
     } else if !s.cfg.model_answer_review {
         answer_review = json!({"status":"no_deterministic_validator"});
     }
+    trace["upstream_rejections"] = json!(upstream_rejections);
     trace["answer_review"] = answer_review;
     trace["answer_review"]["cost"] = json!(review_cost);
     trace["jev_cost"] = json!(selection.jev_cost);
@@ -824,6 +896,166 @@ async fn execute(
         .await?;
     drop(permit);
     response(Json(body).into_response(), &selection, &request_id)
+}
+struct GenerationContext<'a> {
+    app: &'a AppState,
+    key: &'a Credential,
+    task: &'a Task,
+    pool: &'a [Model],
+    broad_pool: &'a [Model],
+    advice: Option<&'a str>,
+    previous_bound: bool,
+    fetched: i64,
+    request_id: &'a str,
+}
+impl GenerationContext<'_> {
+    async fn post(
+        &self,
+        selection: &mut Selection,
+        model: &mut Model,
+        reservation: &mut Reservation,
+        history: &mut Vec<Value>,
+    ) -> Result<reqwest::Response> {
+        loop {
+            let mut trace = reservation.diagnostics();
+            trace.as_object_mut().expect("diagnostics object").extend(
+                metadata(selection, self.task, self.fetched, self.request_id)
+                    .as_object()
+                    .expect("metadata object")
+                    .clone(),
+            );
+            trace["failure"] = Value::Null;
+            trace["upstream_rejections"] = json!(history);
+            reservation.checkpoint(&trace).await?;
+            let mut body = policy::rewrite(self.task, &self.app.cfg, model, selection)?;
+            if let Some(advice) = self.advice {
+                insert_advice(&mut body, self.task.protocol, advice);
+            }
+            match self
+                .app
+                .upstream
+                .post(self.task.protocol.endpoint(), self.key, &body)
+                .await
+            {
+                Ok(response) => return Ok(response),
+                Err(error) => {
+                    let used = history.iter().filter(|h| h["failover"] == true).count();
+                    // HTTP 429 is a definite pre-output rejection. Never replay a
+                    // timeout, an explicit account/key limit, or an emitted stream.
+                    let relaxed = self.pool.iter().all(|m| {
+                        m.id == model.id
+                            || history.iter().any(|h| h["model"] == m.id)
+                            || !self.app.upstream.model_available(
+                                self.key,
+                                self.task.protocol.endpoint(),
+                                &m.id,
+                            )
+                    });
+                    let candidates = if relaxed { self.broad_pool } else { self.pool };
+                    let alternative = ((error.code == "generation_rate_limit"
+                        && error.rate_limit_scope != Some("account")
+                        || error.code == "circuit_open")
+                        && used < self.app.cfg.max_generation_failovers
+                        && !self.previous_bound
+                        && !self.task.tool_turn
+                        && self.task.body.get("previous_response_id").is_none())
+                    .then(|| {
+                        [
+                            &self.app.cfg.output_recovery_model,
+                            &self.app.cfg.repair_model,
+                            &self.app.cfg.fallback_model,
+                        ]
+                        .iter()
+                        .find_map(|id| {
+                            candidates
+                                .iter()
+                                .find(|m| m.id == id.as_str() && self.untried(m, model, history))
+                        })
+                        // No configured fallback is eligible (for example under an operator
+                        // allowlist): use the eligible model closest in estimated cost at or
+                        // above the rejected one, so failover does not silently downgrade.
+                        .or_else(|| self.nearest_peer(candidates, model, history))
+                        .cloned()
+                    })
+                    .flatten();
+                    history.push(json!({"model":model.id,"effort":selection.effort,"status":error.status.as_u16(),
+                        "code":error.code,"rate_limit_scope":error.rate_limit_scope,
+                        "retry_after_seconds":error.retry_after_secs,"failover":alternative.is_some()}));
+                    trace["upstream_rejections"] = json!(history);
+                    trace["failure"] = json!(error.code);
+                    reservation.checkpoint(&trace).await?;
+                    if let Some(next) = alternative {
+                        *model = next;
+                        if relaxed
+                            && (!self.task.plugin.models.is_empty()
+                                || !self.task.plugin.allowed_models.is_empty())
+                        {
+                            selection.list_fallback = Some("models_ignored".into());
+                        }
+                        selection.model = model.id.clone();
+                        selection.control = model.control.clone();
+                        // A 429 is not an output-budget failure: keep comparable reasoning.
+                        selection.effort = equivalent_effort(&selection.effort, model);
+                        // This configured fallback is not a new Jev confidence score.
+                        selection.confidence = 0.0;
+                        selection.margin = 0.0;
+                        selection.reason = "rate_limit_fallback".into();
+                    } else {
+                        return Err(error.with_route(
+                            self.request_id,
+                            &selection.model,
+                            &selection.effort,
+                        ));
+                    }
+                }
+            }
+        }
+    }
+}
+impl GenerationContext<'_> {
+    fn untried(&self, m: &Model, current: &Model, history: &[Value]) -> bool {
+        m.id != current.id
+            && !history.iter().any(|h| h["model"] == m.id)
+            && self
+                .app
+                .upstream
+                .model_available(self.key, self.task.protocol.endpoint(), &m.id)
+    }
+    fn nearest_peer<'m>(
+        &self,
+        candidates: &'m [Model],
+        current: &Model,
+        history: &[Value],
+    ) -> Option<&'m Model> {
+        let cost = |m: &Model| m.estimate(self.task.input_bound, self.task.max_output);
+        let floor = cost(current);
+        let mut peers = candidates
+            .iter()
+            .filter(|m| self.untried(m, current, history))
+            .collect::<Vec<_>>();
+        peers.sort_by(|a, b| cost(a).total_cmp(&cost(b)).then_with(|| a.id.cmp(&b.id)));
+        peers
+            .iter()
+            .find(|m| cost(m) >= floor)
+            .or_else(|| peers.last())
+            .copied()
+    }
+}
+fn equivalent_effort(previous: &str, model: &Model) -> String {
+    if model.efforts.iter().any(|e| e == previous) {
+        return previous.into();
+    }
+    let target = crate::engine::effort_rank(previous);
+    model
+        .efforts
+        .iter()
+        .min_by_key(|e| {
+            let rank = crate::engine::effort_rank(e);
+            // Prefer the nearest supported level, breaking ties upward.
+            (rank.abs_diff(target), usize::from(rank < target))
+        })
+        .cloned()
+        .unwrap_or_else(|| "default".into())
 }
 fn recovery_effort(task: &Task, model: &Model) -> String {
     // A completed empty/truncated answer has already exhausted its budget.
@@ -1074,5 +1306,40 @@ fn insert_advice(body: &mut Value, p: Protocol, advice: &str) {
                 _ => json!(text),
             };
         }
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::equivalent_effort;
+    use crate::registry::Model;
+    fn model(efforts: &[&str]) -> Model {
+        Model {
+            id: "vendor/m".into(),
+            description: String::new(),
+            context: 1000,
+            output: 1000,
+            input_price: 0.0,
+            output_price: 0.0,
+            request_price: 0.0,
+            modalities: vec!["text".into()],
+            parameters: vec![],
+            efforts: efforts.iter().map(|e| e.to_string()).collect(),
+            control: "effort".into(),
+            canonical: "vendor/m".into(),
+        }
+    }
+    #[test]
+    fn failover_effort_keeps_or_approximates_the_selected_level() {
+        assert_eq!(equivalent_effort("high", &model(&["low", "high"])), "high");
+        assert_eq!(
+            equivalent_effort("medium", &model(&["low", "high"])),
+            "high"
+        );
+        assert_eq!(
+            equivalent_effort("xhigh", &model(&["low", "medium", "high"])),
+            "high"
+        );
+        assert_eq!(equivalent_effort("none", &model(&["low", "high"])), "low");
+        assert_eq!(equivalent_effort("high", &model(&["default"])), "default");
     }
 }
