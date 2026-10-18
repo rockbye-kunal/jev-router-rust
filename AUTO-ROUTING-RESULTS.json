@@ -63,8 +63,8 @@
                   ]
                 },
                 {
-                  "estimated_cost": 0.00004072,
-                  "model": "sao10k/l3-lunaris-8b",
+                  "estimated_cost": 0.000089,
+                  "model": "rekaai/reka-edge",
                   "supported_efforts": [
                     "none"
                   ]
@@ -77,13 +77,26 @@
                   ]
                 }
               ],
-              "catalog_fetched_at": 1792272386,
+              "catalog_fetched_at": 1792308174,
               "classifier_context": "bounded recent text and capability signals; full original request forwarded to generator",
               "confidence": 1.0,
               "control": "omit",
               "effort": "none",
               "excluded_models": [],
-              "jev_cost": 0.0019836180000000004,
+              "generation_attempts": [
+                {
+                  "completion_tokens": 3,
+                  "cost": 7e-7,
+                  "effort": "none",
+                  "finish_reason": "stop",
+                  "incomplete": false,
+                  "model": "amazon/nova-micro-v1",
+                  "reasoning_tokens": 0,
+                  "served_model": "amazon/nova-micro-v1",
+                  "usable_output": true
+                }
+              ],
+              "jev_cost": 0.001982064,
               "jev_models": [
                 "typesafe/jev-1.13-20260917",
                 "typesafe/jev-1.13-20260917",
@@ -103,12 +116,12 @@
               "pipeline": "default",
               "policy": "independent Rust tournament policy",
               "reason": "adequacy_confirmed",
-              "request_id": "512f556d-81df-4d57-a417-cab7411ba0ab",
+              "request_id": "5b1857ad-5e79-40b3-9057-066b5e7df1cc",
               "resolved_models": [
                 "amazon/nova-micro-v1"
               ],
-              "routing_elapsed_ms": 4253,
-              "total_elapsed_ms": 4253
+              "routing_elapsed_ms": 2790,
+              "total_elapsed_ms": 2830
             },
             "name": "jev-router"
           }
@@ -162,10 +175,10 @@
                   ]
                 },
                 {
-                  "estimated_cost": 0.0000681,
-                  "model": "google/gemma-3-4b-it",
+                  "estimated_cost": 0.0,
+                  "model": "google/gemma-4-26b-a4b-it:free",
                   "supported_efforts": [
-                    "none"
+                    "default"
                   ]
                 },
                 {
@@ -214,13 +227,26 @@
                   ]
                 }
               ],
-              "catalog_fetched_at": 1792272386,
+              "catalog_fetched_at": 1792308174,
               "classifier_context": "bounded recent text and capability signals; full original request forwarded to generator",
               "confidence": 1.0,
               "control": "omit",
               "effort": "none",
               "excluded_models": [],
-              "jev_cost": 0.001996722,
+              "generation_attempts": [
+                {
+                  "completion_tokens": null,
+                  "cost": 5.95e-7,
+                  "effort": "none",
+                  "finish_reason": "completed",
+                  "incomplete": false,
+                  "model": "amazon/nova-micro-v1",
+                  "reasoning_tokens": null,
+                  "served_model": "amazon/nova-micro-v1",
+                  "usable_output": true
+                }
+              ],
+              "jev_cost": 0.00199752,
               "jev_models": [
                 "typesafe/jev-1.13-20260917",
                 "typesafe/jev-1.13-20260917",
@@ -240,12 +266,12 @@
               "pipeline": "default",
               "policy": "independent Rust tournament policy",
               "reason": "adequacy_confirmed",
-              "request_id": "a56fa28e-a6b3-4f1e-ae3f-b1849a874c54",
+              "request_id": "89333712-afab-4c1e-8ae5-83c9a0184e5d",
               "resolved_models": [
                 "amazon/nova-micro-v1"
               ],
-              "routing_elapsed_ms": 2833,
-              "total_elapsed_ms": 2870
+              "routing_elapsed_ms": 1903,
+              "total_elapsed_ms": 1938
             },
             "name": "jev-router"
           }
@@ -295,9 +321,12 @@
                   ]
                 },
                 {
-                  "estimated_cost": 0.0000693,
-                  "model": "google/gemma-3-4b-it",
+                  "estimated_cost": 0.0002321738,
+                  "model": "deepseek/deepseek-v4-flash-0731",
                   "supported_efforts": [
+                    "max",
+                    "high",
+                    "low",
                     "none"
                   ]
                 },
@@ -347,15 +376,27 @@
                   ]
                 }
               ],
-              "catalog_fetched_at": 1792272386,
+              "catalog_fetched_at": 1792308174,
               "classifier_context": "bounded recent text and capability signals; full original request forwarded to generator",
-              "confidence": 1.0,
+              "confidence": 0.75,
               "control": "omit",
               "effort": "none",
               "excluded_models": [],
-              "jev_cost": 0.001973076,
+              "generation_attempts": [
+                {
+                  "completion_tokens": null,
+                  "cost": 5.95e-7,
+                  "effort": "none",
+                  "finish_reason": "end_turn",
+                  "incomplete": false,
+                  "model": "amazon/nova-micro-v1",
+                  "reasoning_tokens": null,
+                  "served_model": "amazon/nova-micro-v1",
+                  "usable_output": true
+                }
+              ],
+              "jev_cost": 0.001943802,
               "jev_models": [
-                "typesafe/jev-1.13-20260917",
                 "typesafe/jev-1.13-20260917",
                 "typesafe/jev-1.13-20260917",
                 "typesafe/jev-1.13-20260917",
@@ -367,18 +408,18 @@
                 "typesafe/jev-1.13-20260917"
               ],
               "list_fallback": null,
-              "margin": 1.0,
+              "margin": 0.6900000000000001,
               "model": "amazon/nova-micro-v1",
               "models": [],
               "pipeline": "default",
               "policy": "independent Rust tournament policy",
-              "reason": "adequacy_confirmed",
-              "request_id": "4c73e40d-b17c-4ce5-a482-fd6cc58938b9",
+              "reason": "jev",
+              "request_id": "33acf4cc-5f86-4d10-9433-5b3858419445",
               "resolved_models": [
                 "amazon/nova-micro-v1"
               ],
-              "routing_elapsed_ms": 2470,
-              "total_elapsed_ms": 2470
+              "routing_elapsed_ms": 1568,
+              "total_elapsed_ms": 1940
             },
             "name": "jev-router"
           }
@@ -472,13 +513,26 @@
                   ]
                 }
               ],
-              "catalog_fetched_at": 1792272386,
+              "catalog_fetched_at": 1792308174,
               "classifier_context": "bounded recent text and capability signals; full original request forwarded to generator",
-              "confidence": 0.71,
+              "confidence": 0.72,
               "control": "effort",
               "effort": "low",
               "excluded_models": [],
-              "jev_cost": 0.001644972,
+              "generation_attempts": [
+                {
+                  "completion_tokens": 71,
+                  "cost": 0.00003065,
+                  "effort": "low",
+                  "finish_reason": "tool_calls",
+                  "incomplete": false,
+                  "model": "openai/gpt-5-nano",
+                  "reasoning_tokens": 111,
+                  "served_model": "openai/gpt-5-nano",
+                  "usable_output": true
+                }
+              ],
+              "jev_cost": 0.00164514,
               "jev_models": [
                 "typesafe/jev-1.13-20260917",
                 "typesafe/jev-1.13-20260917",
@@ -492,18 +546,18 @@
                 "typesafe/jev-1.13-20260917"
               ],
               "list_fallback": null,
-              "margin": 0.5700000000000001,
+              "margin": 0.5900000000000001,
               "model": "openai/gpt-5-nano",
               "models": [],
               "pipeline": "default",
               "policy": "independent Rust tournament policy",
               "reason": "adequacy_confirmed",
-              "request_id": "57c24782-7877-42df-8529-220e6ea5e70f",
+              "request_id": "fcf83b44-06e1-4802-bece-8eb5861e3907",
               "resolved_models": [
                 "openai/gpt-5-nano"
               ],
-              "routing_elapsed_ms": 3489,
-              "total_elapsed_ms": 4617
+              "routing_elapsed_ms": 3215,
+              "total_elapsed_ms": 4791
             },
             "name": "jev-router"
           }
@@ -515,22 +569,22 @@
             "arguments": "{\"city\":\"Pune\"}",
             "name": "get_weather"
           },
-          "id": "call_1w3V96LFrrD9wMMsCew1cMV3",
+          "id": "call_jpEbN3MtZ3mH1hqkFs2rgfEz",
           "index": 0,
           "type": "function"
         }
       ],
       "usage": {
-        "completion_tokens": 66,
+        "completion_tokens": 71,
         "completion_tokens_details": {
           "audio_tokens": 0,
           "image_tokens": 0,
-          "reasoning_tokens": 94
+          "reasoning_tokens": 111
         },
-        "cost": 0.00002865,
+        "cost": 0.00003065,
         "cost_details": {
-          "upstream_inference_completions_cost": 0.0000264,
-          "upstream_inference_cost": 0.00002865,
+          "upstream_inference_completions_cost": 0.0000284,
+          "upstream_inference_cost": 0.00003065,
           "upstream_inference_prompt_cost": 2.25e-6
         },
         "is_byok": false,
@@ -541,12 +595,12 @@
           "cached_tokens": 0,
           "video_tokens": 0
         },
-        "total_tokens": 111
+        "total_tokens": 116
       }
     },
     {
-      "answer": "{\"ok\": true}",
-      "model": "mistralai/mistral-small-24b-instruct-2501",
+      "answer": "{\"ok\":true}",
+      "model": "openai/gpt-4o-mini",
       "path": "/v1/chat/completions",
       "routing": {
         "pipeline": [
@@ -583,24 +637,24 @@
                   ]
                 },
                 {
-                  "estimated_cost": 0.00011062,
-                  "model": "mistralai/mistral-small-24b-instruct-2501",
+                  "estimated_cost": 0.00023969999999999997,
+                  "model": "mistralai/ministral-8b-2512",
                   "supported_efforts": [
                     "none"
                   ]
                 },
                 {
                   "estimated_cost": 0.0007005,
-                  "model": "openai/gpt-4o-mini-2024-07-18",
+                  "model": "openai/gpt-4o-mini",
                   "supported_efforts": [
                     "none"
                   ]
                 },
                 {
-                  "estimated_cost": 0.005137,
-                  "model": "openai/o4-mini",
+                  "estimated_cost": 0.0002622,
+                  "model": "qwen/qwen-2.5-7b-instruct",
                   "supported_efforts": [
-                    "default"
+                    "none"
                   ]
                 },
                 {
@@ -617,22 +671,27 @@
                   ]
                 }
               ],
-              "catalog_fetched_at": 1792272386,
+              "catalog_fetched_at": 1792308174,
               "classifier_context": "bounded recent text and capability signals; full original request forwarded to generator",
               "confidence": 0.98,
               "control": "omit",
               "effort": "none",
               "excluded_models": [],
-              "jev_cost": 0.0031775939999999997,
+              "generation_attempts": [
+                {
+                  "completion_tokens": 5,
+                  "cost": 9.45e-6,
+                  "effort": "none",
+                  "finish_reason": "stop",
+                  "incomplete": false,
+                  "model": "openai/gpt-4o-mini",
+                  "reasoning_tokens": 0,
+                  "served_model": "openai/gpt-4o-mini",
+                  "usable_output": true
+                }
+              ],
+              "jev_cost": 0.0015925140000000002,
               "jev_models": [
-                "typesafe/jev-1.13-20260917",
-                "typesafe/jev-1.13-20260917",
-                "typesafe/jev-1.13-20260917",
-                "typesafe/jev-1.13-20260917",
-                "typesafe/jev-1.13-20260917",
-                "typesafe/jev-1.13-20260917",
-                "typesafe/jev-1.13-20260917",
-                "typesafe/jev-1.13-20260917",
                 "typesafe/jev-1.13-20260917",
                 "typesafe/jev-1.13-20260917",
                 "typesafe/jev-1.13-20260917",
@@ -642,19 +701,19 @@
                 "typesafe/jev-1.13-20260917",
                 "typesafe/jev-1.13-20260917"
               ],
-              "list_fallback": "models_ignored",
+              "list_fallback": null,
               "margin": 0.98,
-              "model": "mistralai/mistral-small-24b-instruct-2501",
+              "model": "openai/gpt-4o-mini",
               "models": [],
               "pipeline": "default",
               "policy": "independent Rust tournament policy",
-              "reason": "endpoint_fallback:adequacy_confirmed",
-              "request_id": "e89970ba-b76e-40ce-bba2-c24c51ff45b0",
+              "reason": "adequacy_confirmed",
+              "request_id": "9d8dc5a3-eb78-4acb-a47e-d66d1c3f6936",
               "resolved_models": [
-                "mistralai/mistral-small-24b-instruct-2501"
+                "openai/gpt-4o-mini"
               ],
-              "routing_elapsed_ms": 4240,
-              "total_elapsed_ms": 4763
+              "routing_elapsed_ms": 2587,
+              "total_elapsed_ms": 2976
             },
             "name": "jev-router"
           }
@@ -662,31 +721,31 @@
       },
       "tool_calls": null,
       "usage": {
-        "completion_tokens": 6,
+        "completion_tokens": 5,
         "completion_tokens_details": {
           "audio_tokens": 0,
           "image_tokens": 0,
           "reasoning_tokens": 0
         },
-        "cost": 8.83e-6,
+        "cost": 9.45e-6,
         "cost_details": {
-          "upstream_inference_completions_cost": 4.8e-7,
-          "upstream_inference_cost": 8.83e-6,
-          "upstream_inference_prompt_cost": 8.35e-6
+          "upstream_inference_completions_cost": 3e-6,
+          "upstream_inference_cost": 9.45e-6,
+          "upstream_inference_prompt_cost": 6.45e-6
         },
         "is_byok": false,
-        "prompt_tokens": 167,
+        "prompt_tokens": 43,
         "prompt_tokens_details": {
           "audio_tokens": 0,
           "cache_write_tokens": 0,
           "cached_tokens": 0,
           "video_tokens": 0
         },
-        "total_tokens": 173
+        "total_tokens": 48
       }
     },
     {
-      "answer": "The total is calculated as (3 × ₹80) + (2 × ₹15) = ₹240 + ₹30, resulting in a total ₹270.00.",
+      "answer": "The calculation is (3 × 80) + (2 × 15) = 240 + 30, resulting in a total ₹270.00.",
       "model": "google/gemini-3-flash-preview",
       "path": "/v1/chat/completions",
       "routing": {
@@ -762,13 +821,37 @@
                   ]
                 }
               ],
-              "catalog_fetched_at": 1792272386,
+              "catalog_fetched_at": 1792308174,
               "classifier_context": "bounded recent text and capability signals; full original request forwarded to generator",
               "confidence": 1.0,
               "control": "effort",
               "effort": "medium",
               "excluded_models": [],
-              "jev_cost": 0.001990758,
+              "generation_attempts": [
+                {
+                  "completion_tokens": 28,
+                  "cost": 5.215e-6,
+                  "effort": "none",
+                  "finish_reason": "stop",
+                  "incomplete": false,
+                  "model": "amazon/nova-micro-v1",
+                  "reasoning_tokens": 0,
+                  "served_model": "amazon/nova-micro-v1",
+                  "usable_output": true
+                },
+                {
+                  "completion_tokens": 416,
+                  "cost": 0.001295,
+                  "effort": "medium",
+                  "finish_reason": "stop",
+                  "incomplete": false,
+                  "model": "google/gemini-3-flash-preview",
+                  "reasoning_tokens": 376,
+                  "served_model": "google/gemini-3-flash-preview",
+                  "usable_output": true
+                }
+              ],
+              "jev_cost": 0.0019909679999999996,
               "jev_models": [
                 "typesafe/jev-1.13-20260917",
                 "typesafe/jev-1.13-20260917",
@@ -788,11 +871,11 @@
               "pipeline": "default",
               "policy": "independent Rust tournament policy",
               "reason": "answer_repaired",
-              "request_id": "6b728bb2-763d-48c3-b1fc-be7f13b7fc84",
+              "request_id": "1b69a801-b430-490c-a59b-004978641108",
               "resolved_models": [
                 "google/gemini-3-flash-preview"
               ],
-              "total_elapsed_ms": 7482
+              "total_elapsed_ms": 5431
             },
             "name": "jev-router"
           }
@@ -800,16 +883,16 @@
       },
       "tool_calls": null,
       "usage": {
-        "completion_tokens": 320,
+        "completion_tokens": 416,
         "completion_tokens_details": {
           "audio_tokens": 0,
           "image_tokens": 0,
-          "reasoning_tokens": 278
+          "reasoning_tokens": 376
         },
-        "cost": 0.001007,
+        "cost": 0.001295,
         "cost_details": {
-          "upstream_inference_completions_cost": 0.00096,
-          "upstream_inference_cost": 0.001007,
+          "upstream_inference_completions_cost": 0.001248,
+          "upstream_inference_cost": 0.001295,
           "upstream_inference_prompt_cost": 0.000047
         },
         "is_byok": false,
@@ -820,7 +903,7 @@
           "cached_tokens": 0,
           "video_tokens": 0
         },
-        "total_tokens": 414
+        "total_tokens": 510
       }
     },
     {
@@ -828,7 +911,7 @@
       "effort": "none",
       "model": "amazon/nova-micro-v1",
       "path": "/v1/chat/completions",
-      "reported_cost": 0.0,
+      "reported_cost": 5.95e-7,
       "stream": true
     },
     {

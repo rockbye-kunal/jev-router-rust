@@ -227,15 +227,7 @@ impl Engine {
         } else {
             0.0
         };
-        generation
-            * if self.cfg.verify_text_answers && !task.stream {
-                2.0
-            } else {
-                1.0
-            }
-            + advisor
-            + review
-            + judge
+        generation * if !task.stream { 2.0 } else { 1.0 } + advisor + review + judge
     }
     pub fn fit_budget(&self, task: &Task, pool: &[Model]) -> Result<Vec<Model>> {
         let mut ranked = pool.to_vec();
@@ -563,7 +555,7 @@ impl Engine {
     }
 }
 
-fn effort_rank(e: &str) -> usize {
+pub(crate) fn effort_rank(e: &str) -> usize {
     match e {
         "max" => 6,
         "xhigh" => 5,

@@ -1,0 +1,253 @@
+{
+  "status": "failed",
+  "verification": "Independent exhaustive enumeration; model optimality claims are not used as evidence",
+  "feasible_plans_checked": 1830,
+  "expected": [
+    {
+      "profit": 2790,
+      "A": 6,
+      "B": 18,
+      "C": 6,
+      "used": [
+        78,
+        90,
+        60
+      ],
+      "unused": [
+        2,
+        0,
+        0
+      ]
+    }
+  ],
+  "checks": {
+    "http_success": true,
+    "completed": true,
+    "json_parseable": true,
+    "integer_quantities": true,
+    "constraints": false,
+    "profit_arithmetic": true,
+    "capacity_arithmetic": true,
+    "globally_optimal": false
+  },
+  "response_json_was_code_fenced": false,
+  "actual": {
+    "quantities": {
+      "A": 18,
+      "B": 11,
+      "C": 0
+    },
+    "total_profit": 2305,
+    "used_capacity": {
+      "machining": 76,
+      "assembly": 80,
+      "material": 40
+    },
+    "unused_capacity": {
+      "machining": 4,
+      "assembly": 10,
+      "material": 20
+    },
+    "optimality_explanation": "No feasible plan exists with C=0 because the contract requires C >= 1, so the true optimum must satisfy C >= 1. Solving the integer program max 70A + 95B + 110C subject to 3A + 2B + 4C <= 80, 2A + 4B + C <= 90, A + 2B + 3C <= 60, A >= 3, B >= 2, 1 <= C <= 12, A,B,C integers: for each integer C in {1,...,12}, the remaining 2-variable integer problem in A,B was optimized exactly. The best profits by C are: C=1 -> 2290 at (A,B)=(18,10); C=2 -> 2215 at (17,9); C=3 -> 2140 at (16,8); C=4 -> 2065 at (15,7); C=5 -> 1990 at (14,6); C=6 -> 1915 at (13,5); C=7 -> 1840 at (12,4); C=8 -> 1765 at (11,3); C=9 -> 1690 at (10,2); C=10 -> 1595 at (8,3); C=11 -> 1500 at (6,4); C=12 -> 1405 at (4,5). Therefore the globally best feasible integer solution is A=18, B=10, C=1 with profit 2290. Constraint check: machining 3*18 + 2*10 + 4*1 = 78 <= 80; assembly 2*18 + 4*10 + 1*1 = 77 <= 90; material 18 + 2*10 + 3*1 = 41 <= 60; contracts A=18 >= 3, B=10 >= 2, C=1 >= 1, and C=1 <= 12. Used capacity is (78,77,41) and unused capacity is (2,13,19)."
+  },
+  "live_request": {
+    "request": {
+      "model": "auto",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Solve this integer production-planning problem exactly. A factory makes products A, B and C. Each unit of A uses 3 machining hours, 2 assembly hours and 1 material unit and earns profit 70. Each B uses 2 machining hours, 4 assembly hours and 2 material units and earns profit 95. Each C uses 4 machining hours, 1 assembly hour and 3 material units and earns profit 110. Available capacity is 80 machining hours, 90 assembly hours and 60 material units. All quantities must be integers. Contracts require A >= 3, B >= 2 and C >= 1; C <= 12. Find the globally profit-maximizing feasible plan. Verify all constraints, give used and unused capacity, and demonstrate global optimality, not just a feasible heuristic. Return only JSON with fields quantities (object A,B,C), total_profit (integer), used_capacity (object machining,assembly,material), unused_capacity (same keys), and optimality_explanation (string)."
+        }
+      ],
+      "max_tokens": 3500,
+      "stream": false
+    },
+    "automatic_model_and_effort": true,
+    "status": 200,
+    "headers": {
+      "x-request-id": "13b912ea-4d2a-4c63-bd5f-29a564491579",
+      "x-jev-model": "openai/gpt-5.4",
+      "x-jev-effort": "none",
+      "x-jev-reason": "empty_output_recovered"
+    },
+    "response": {
+      "choices": [
+        {
+          "finish_reason": "stop",
+          "index": 0,
+          "logprobs": null,
+          "message": {
+            "content": "{\"quantities\":{\"A\":18,\"B\":11,\"C\":0},\"total_profit\":2305,\"used_capacity\":{\"machining\":76,\"assembly\":80,\"material\":40},\"unused_capacity\":{\"machining\":4,\"assembly\":10,\"material\":20},\"optimality_explanation\":\"No feasible plan exists with C=0 because the contract requires C >= 1, so the true optimum must satisfy C >= 1. Solving the integer program max 70A + 95B + 110C subject to 3A + 2B + 4C <= 80, 2A + 4B + C <= 90, A + 2B + 3C <= 60, A >= 3, B >= 2, 1 <= C <= 12, A,B,C integers: for each integer C in {1,...,12}, the remaining 2-variable integer problem in A,B was optimized exactly. The best profits by C are: C=1 -> 2290 at (A,B)=(18,10); C=2 -> 2215 at (17,9); C=3 -> 2140 at (16,8); C=4 -> 2065 at (15,7); C=5 -> 1990 at (14,6); C=6 -> 1915 at (13,5); C=7 -> 1840 at (12,4); C=8 -> 1765 at (11,3); C=9 -> 1690 at (10,2); C=10 -> 1595 at (8,3); C=11 -> 1500 at (6,4); C=12 -> 1405 at (4,5). Therefore the globally best feasible integer solution is A=18, B=10, C=1 with profit 2290. Constraint check: machining 3*18 + 2*10 + 4*1 = 78 <= 80; assembly 2*18 + 4*10 + 1*1 = 77 <= 90; material 18 + 2*10 + 3*1 = 41 <= 60; contracts A=18 >= 3, B=10 >= 2, C=1 >= 1, and C=1 <= 12. Used capacity is (78,77,41) and unused capacity is (2,13,19).\"}",
+            "refusal": null,
+            "role": "assistant"
+          },
+          "native_finish_reason": "completed"
+        }
+      ],
+      "created": 1792309586,
+      "id": "gen-1792309586-0bO75VIEWjJGJ7YYubQA",
+      "model": "openai/gpt-5.4",
+      "object": "chat.completion",
+      "openrouter_metadata": {
+        "pipeline": [
+          {
+            "data": {
+              "advisor_model": null,
+              "answer_review": {
+                "cost": 0.0,
+                "status": "no_deterministic_validator"
+              },
+              "billing_exact": true,
+              "candidates": [
+                {
+                  "estimated_cost": 0.008153,
+                  "model": "deepseek/deepseek-r1-0528",
+                  "supported_efforts": [
+                    "default"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.037512000000000004,
+                  "model": "google/gemini-4-argon",
+                  "supported_efforts": [
+                    "high",
+                    "medium",
+                    "low"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0012456000000000001,
+                  "model": "meta-llama/llama-3.3-70b-instruct",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.24767999999999998,
+                  "model": "openai/gpt-4",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0167816,
+                  "model": "openai/o3-mini",
+                  "supported_efforts": [
+                    "default"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0128152,
+                  "model": "qwen/qwen3-235b-a22b-thinking-2507",
+                  "supported_efforts": [
+                    "default"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.00924872,
+                  "model": "z-ai/glm-5.2",
+                  "supported_efforts": [
+                    "xhigh",
+                    "high",
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.015507199999999999,
+                  "model": "z-ai/glm-5v-turbo",
+                  "supported_efforts": [
+                    "default"
+                  ]
+                }
+              ],
+              "catalog_fetched_at": 1792308174,
+              "classifier_context": "bounded recent text and capability signals; full original request forwarded to generator",
+              "confidence": 0.7,
+              "control": "effort",
+              "effort": "none",
+              "excluded_models": [],
+              "generation_attempts": [
+                {
+                  "completion_tokens": 3500,
+                  "cost": 0.053247,
+                  "effort": "high",
+                  "finish_reason": "length",
+                  "incomplete": true,
+                  "model": "anthropic/claude-sonnet-4.6",
+                  "reasoning_tokens": 3500,
+                  "served_model": "anthropic/claude-sonnet-4.6",
+                  "usable_output": false
+                },
+                {
+                  "completion_tokens": 510,
+                  "cost": 0.0081875,
+                  "effort": "none",
+                  "finish_reason": "stop",
+                  "incomplete": false,
+                  "model": "openai/gpt-5.4",
+                  "reasoning_tokens": 0,
+                  "served_model": "openai/gpt-5.4",
+                  "usable_output": true
+                }
+              ],
+              "jev_cost": 0.0020852580000000004,
+              "jev_models": [
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917"
+              ],
+              "list_fallback": null,
+              "margin": 0.7,
+              "model": "openai/gpt-5.4",
+              "models": [],
+              "pipeline": "default",
+              "policy": "independent Rust tournament policy",
+              "reason": "empty_output_recovered",
+              "request_id": "13b912ea-4d2a-4c63-bd5f-29a564491579",
+              "resolved_models": [
+                "openai/gpt-5.4"
+              ],
+              "total_elapsed_ms": 51973
+            },
+            "name": "jev-router"
+          }
+        ]
+      },
+      "provider": "OpenAI",
+      "service_tier": "default",
+      "system_fingerprint": null,
+      "usage": {
+        "completion_tokens": 510,
+        "completion_tokens_details": {
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "reasoning_tokens": 0
+        },
+        "cost": 0.0081875,
+        "cost_details": {
+          "upstream_inference_completions_cost": 0.00765,
+          "upstream_inference_cost": 0.0081875,
+          "upstream_inference_prompt_cost": 0.0005375
+        },
+        "is_byok": false,
+        "prompt_tokens": 215,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "video_tokens": 0
+        },
+        "total_tokens": 725
+      }
+    },
+    "elapsed_seconds": 53.063
+  }
+}

@@ -105,6 +105,7 @@ impl Store {
             reserved: amount,
             store: self.clone(),
             finished: false,
+            checkpoint: json!({}),
         })
     }
     pub async fn settle(&self, id: &str, cost: f64, status: &str, metadata: &Value) -> Result<()> {
@@ -227,8 +228,20 @@ pub struct Reservation {
     pub reserved: f64,
     store: Arc<Store>,
     finished: bool,
+    checkpoint: Value,
 }
 impl Reservation {
+    /// Persist routing diagnostics before paid work, without storing request content.
+    pub async fn checkpoint(&mut self, metadata: &Value) -> Result<()> {
+        sqlx::query("UPDATE requests SET metadata=? WHERE id=? AND status='pending'")
+            .bind(metadata.to_string())
+            .bind(&self.id)
+            .execute(&self.store.pool)
+            .await
+            .map_err(Error::internal)?;
+        self.checkpoint = metadata.clone();
+        Ok(())
+    }
     pub async fn finish(mut self, cost: f64, status: &str, metadata: &Value) -> Result<()> {
         self.store.settle(&self.id, cost, status, metadata).await?;
         self.finished = true;
@@ -241,8 +254,14 @@ impl Drop for Reservation {
             let store = self.store.clone();
             let id = self.id.clone();
             let amount = self.reserved;
+            let mut trace = self.checkpoint.clone();
+            trace["billing"] = json!("conservative reservation; provider cost unavailable");
             if let Ok(runtime) = tokio::runtime::Handle::try_current() {
-                runtime.spawn(async move{let _=store.settle(&id,amount,"cancelled_estimate",&json!({"billing":"conservative reservation; provider cost unavailable"})).await;});
+                runtime.spawn(async move {
+                    let _ = store
+                        .settle(&id, amount, "cancelled_estimate", &trace)
+                        .await;
+                });
             }
         }
     }

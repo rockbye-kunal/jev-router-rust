@@ -3,7 +3,7 @@ use crate::{
     engine::Engine,
     error::{Error, Result},
     policy::{self, Protocol, Selection, Task},
-    registry::Registry,
+    registry::{Model, Registry},
     store::Store,
     stream::Inspector,
     upstream::{Credential, Upstream},
@@ -430,7 +430,7 @@ async fn execute(
         policy::provider(&task, &s.cfg, candidate)?;
     }
     let estimate = s.engine.reserve_estimate(&task, &broad_pool);
-    let reservation = s.store.reserve(&key.tenant(), estimate, &s.cfg).await?;
+    let mut reservation = s.store.reserve(&key.tenant(), estimate, &s.cfg).await?;
     let request_id = reservation.id.clone();
     let started = std::time::Instant::now();
     let (mut selection, mut model, wants_advisor) = s
@@ -481,6 +481,7 @@ async fn execute(
             }
         }
     }
+    reservation.checkpoint(&trace).await?;
     let mut body = policy::rewrite(&task, &s.cfg, &model, &selection)?;
     if let Some(advice) = advice.as_deref() {
         insert_advice(&mut body, task.protocol, advice);
@@ -514,7 +515,10 @@ async fn execute(
             upstream = s.upstream.post(task.protocol.endpoint(), &key, &body).await;
         }
     }
-    let upstream = upstream?;
+    trace = metadata(&selection, &task, registry.fetched_at, &request_id);
+    reservation.checkpoint(&trace).await?;
+    let upstream =
+        upstream.map_err(|e| e.with_route(&request_id, &selection.model, &selection.effort))?;
     trace = metadata(&selection, &task, registry.fetched_at, &request_id);
     if wants_advisor && selection.advisor_model.is_none() {
         trace["max_fallback"] = json!("deep");
@@ -563,36 +567,98 @@ async fn execute(
             "Provider served an unexpected model",
         ));
     }
-    let valid = match task.protocol {
-        Protocol::Chat => body["choices"].as_array().is_some_and(|a| {
-            a.iter().any(|c| {
-                c["message"]["content"]
-                    .as_str()
-                    .is_some_and(|s| !s.trim().is_empty())
-                    || c["message"]["tool_calls"]
-                        .as_array()
-                        .is_some_and(|a| !a.is_empty())
+    let mut attempts = vec![generation_diagnostic(&body, task.protocol, &selection)];
+    let mut generation_cost = provider_cost(&body);
+    let mut recovered = false;
+    if !usable_output(&body, task.protocol) || incomplete_output(&body, task.protocol) {
+        // Only a fully received response without output may be regenerated. Never
+        // replay ambiguous transport errors, refusals, tool results or bound sessions.
+        let repair = (!provider_refusal(&body, task.protocol)
+            && previous.is_none()
+            && !task.tool_turn
+            && task.body.get("previous_response_id").is_none())
+        .then(|| {
+            [
+                &s.cfg.output_recovery_model,
+                &s.cfg.fallback_model,
+                &s.cfg.repair_model,
+            ]
+            .iter()
+            .find_map(|id| {
+                pool.iter().find(|m| {
+                    m.id == id.as_str()
+                        && (m.id != model.id
+                            || crate::engine::effort_rank(&recovery_effort(&task, m))
+                                < crate::engine::effort_rank(&selection.effort))
+                })
             })
-        }),
-        Protocol::Responses => body["output"].as_array().is_some_and(|a| !a.is_empty()),
-        Protocol::Messages => body["content"].as_array().is_some_and(|a| !a.is_empty()),
-    };
-    if !valid {
-        return Err(Error::new(
-            502,
-            "empty_output",
-            "Provider returned no visible output or tool calls",
-        ));
+            .cloned()
+        })
+        .flatten();
+        if let Some(repair) = repair {
+            model = repair;
+            selection.model = model.id.clone();
+            selection.control = model.control.clone();
+            selection.effort = recovery_effort(&task, &model);
+            selection.reason = if usable_output(&body, task.protocol) {
+                "truncated_output_recovered"
+            } else {
+                "empty_output_recovered"
+            }
+            .into();
+            trace = metadata(&selection, &task, registry.fetched_at, &request_id);
+            trace["generation_attempts"] = json!(attempts);
+            reservation.checkpoint(&trace).await?;
+            let rewritten = policy::rewrite(&task, &s.cfg, &model, &selection)?;
+            let r = s
+                .upstream
+                .post(task.protocol.endpoint(), &key, &rewritten)
+                .await
+                .map_err(|e| e.with_route(&request_id, &selection.model, &selection.effort))?;
+            body = Upstream::json(r, 16 * 1024 * 1024)
+                .await
+                .map_err(|e| e.with_route(&request_id, &selection.model, &selection.effort))?;
+            if !served_model(&model.id, body["model"].as_str().unwrap_or("")) {
+                return Err(Error::new(
+                    502,
+                    "unexpected_model",
+                    "Recovery provider served an unexpected model",
+                )
+                .with_route(&request_id, &selection.model, &selection.effort));
+            }
+            attempts.push(generation_diagnostic(&body, task.protocol, &selection));
+            generation_cost = generation_cost
+                .zip(provider_cost(&body))
+                .map(|(a, b)| a + b);
+            recovered = true;
+        }
+        if !usable_output(&body, task.protocol) || incomplete_output(&body, task.protocol) {
+            let code = if usable_output(&body, task.protocol) {
+                "output_incomplete"
+            } else {
+                "empty_output"
+            };
+            trace["generation_attempts"] = json!(attempts);
+            trace["failure"] = json!(code);
+            trace["billing_exact"] = json!(generation_cost.is_some());
+            let cost = generation_cost
+                .map(|c| c + selection.jev_cost + advice_cost)
+                .unwrap_or(reservation.reserved);
+            reservation.finish(cost, code, &trace).await?;
+            return Err(Error::new(502, code,
+                "Provider returned empty or incomplete output; bounded recovery exhausted or no eligible recovery model")
+                .with_route(&request_id, &selection.model, &selection.effort));
+        }
     }
-    let initial_cost = body["usage"]["cost"]
-        .as_f64()
-        .filter(|n| n.is_finite() && *n >= 0.0);
-    let mut generation_cost = initial_cost;
+    trace["generation_attempts"] = json!(attempts);
+    reservation.checkpoint(&trace).await?;
+    let initial_cost = generation_cost;
     let mut review_cost = 0.0;
     let mut review_exact = true;
     let calculation = crate::validation::request_total(&task);
     let mut answer_review = json!({"status":"not_applicable"});
     if s.cfg.verify_text_answers
+        && !provider_refusal(&body, task.protocol)
         && !task.structured
         && (calculation.is_some() || s.cfg.model_answer_review)
         && let Some(text) = reviewable_text(&body, task.protocol)
@@ -608,6 +674,20 @@ async fn execute(
             review_exact &= exact;
             answer_review = json!({"status":"accepted","model":review_model,"attempts":1});
             if !accepted {
+                if recovered {
+                    trace["answer_review"] = json!({"status":"rejected_after_recovery"});
+                    reservation.checkpoint(&trace).await?;
+                    return Err(Error::new(
+                        502,
+                        "answer_review_failed",
+                        "Recovered answer failed verification; generation attempt limit reached",
+                    )
+                    .with_route(
+                        &request_id,
+                        &selection.model,
+                        &selection.effort,
+                    ));
+                }
                 if task.tool_turn || task.body.get("previous_response_id").is_some() {
                     return Err(Error::new(
                         502,
@@ -689,9 +769,13 @@ async fn execute(
                     )
                     .map(|(a, b)| a + b);
                 answer_review = json!({"status":"repaired","model":review_model,"attempts":2});
+                attempts.push(generation_diagnostic(&body, task.protocol, &selection));
                 trace = metadata(&selection, &task, registry.fetched_at, &request_id);
+                trace["generation_attempts"] = json!(attempts);
             }
         }
+    } else if provider_refusal(&body, task.protocol) {
+        answer_review = json!({"status":"provider_refusal"});
     } else if !s.cfg.verify_text_answers {
         answer_review = json!({"status":"disabled"});
     } else if task.structured {
@@ -740,6 +824,129 @@ async fn execute(
         .await?;
     drop(permit);
     response(Json(body).into_response(), &selection, &request_id)
+}
+fn recovery_effort(task: &Task, model: &Model) -> String {
+    // A completed empty/truncated answer has already exhausted its budget.
+    // When explicitly supported, disable hidden reasoning for the final attempt
+    // so it cannot consume the visible answer's entire allowance again.
+    if model.efforts.iter().any(|e| e == "none") {
+        return "none".into();
+    }
+    let target = if task.max_output <= 4096 {
+        "low"
+    } else {
+        "medium"
+    };
+    if model.efforts.iter().any(|e| e == target) {
+        return target.into();
+    }
+    // Never interpret descending catalog order as a preferred recovery effort.
+    [
+        "minimal", "low", "medium", "none", "default", "high", "xhigh", "max",
+    ]
+    .iter()
+    .find(|e| model.efforts.iter().any(|v| v == **e))
+    .copied()
+    .unwrap_or("default")
+    .into()
+}
+fn provider_cost(body: &Value) -> Option<f64> {
+    body["usage"]["cost"]
+        .as_f64()
+        .filter(|c| c.is_finite() && *c >= 0.0)
+}
+fn provider_refusal(body: &Value, protocol: Protocol) -> bool {
+    match protocol {
+        Protocol::Chat => body["choices"].as_array().is_some_and(|a| {
+            a.iter().any(|c| {
+                c["finish_reason"] == "content_filter"
+                    || c["message"]["refusal"]
+                        .as_str()
+                        .is_some_and(|s| !s.is_empty())
+            })
+        }),
+        Protocol::Responses => body["output"].as_array().is_some_and(|a| {
+            a.iter().any(|i| {
+                i["content"]
+                    .as_array()
+                    .is_some_and(|c| c.iter().any(|c| c["type"] == "refusal"))
+            })
+        }),
+        Protocol::Messages => body["stop_reason"] == "refusal",
+    }
+}
+fn incomplete_output(body: &Value, protocol: Protocol) -> bool {
+    if provider_refusal(body, protocol) {
+        return false;
+    }
+    match protocol {
+        Protocol::Chat => body["choices"]
+            .as_array()
+            .is_some_and(|a| a.iter().any(|c| c["finish_reason"] == "length")),
+        Protocol::Responses => body["status"] == "incomplete",
+        Protocol::Messages => body["stop_reason"] == "max_tokens",
+    }
+}
+fn usable_output(body: &Value, protocol: Protocol) -> bool {
+    if provider_refusal(body, protocol) {
+        return true;
+    }
+    match protocol {
+        Protocol::Chat => body["choices"].as_array().is_some_and(|a| {
+            a.iter().any(|c| {
+                c["message"]["content"]
+                    .as_str()
+                    .is_some_and(|s| !s.trim().is_empty())
+                    || c["message"]["content"].as_array().is_some_and(|a| {
+                        a.iter().any(|c| {
+                            c["text"].as_str().is_some_and(|s| !s.trim().is_empty())
+                                || c["type"] == "image_url"
+                        })
+                    })
+                    || c["message"]["tool_calls"]
+                        .as_array()
+                        .is_some_and(|a| !a.is_empty())
+                    || c["message"]["audio"]["data"]
+                        .as_str()
+                        .is_some_and(|s| !s.is_empty())
+                    || c["message"]["images"]
+                        .as_array()
+                        .is_some_and(|a| !a.is_empty())
+            })
+        }),
+        Protocol::Responses => body["output"].as_array().is_some_and(|a| {
+            a.iter().any(|i| {
+                matches!(
+                    i["type"].as_str(),
+                    Some(
+                        "function_call"
+                            | "image_generation_call"
+                            | "computer_call"
+                            | "custom_tool_call"
+                    )
+                ) || i["content"].as_array().is_some_and(|a| {
+                    a.iter().any(|c| {
+                        c["text"].as_str().is_some_and(|s| !s.trim().is_empty())
+                            || c["type"] == "output_audio"
+                    })
+                })
+            })
+        }),
+        Protocol::Messages => body["content"].as_array().is_some_and(|a| {
+            a.iter().any(|c| {
+                c["type"] == "tool_use" || c["text"].as_str().is_some_and(|s| !s.trim().is_empty())
+            })
+        }),
+    }
+}
+fn generation_diagnostic(body: &Value, protocol: Protocol, selection: &Selection) -> Value {
+    // Never retain answer text, hidden reasoning, tool arguments or provider error details.
+    json!({"model":selection.model,"served_model":body["model"],"effort":selection.effort,
+        "usable_output":usable_output(body,protocol),"incomplete":incomplete_output(body,protocol),
+        "finish_reason":match protocol {Protocol::Chat=> &body["choices"][0]["finish_reason"],Protocol::Responses=> &body["status"],Protocol::Messages=> &body["stop_reason"]},
+        "completion_tokens":body["usage"]["completion_tokens"],
+        "reasoning_tokens":body["usage"]["completion_tokens_details"]["reasoning_tokens"],
+        "cost":provider_cost(body)})
 }
 fn reviewable_text(body: &Value, protocol: Protocol) -> Option<String> {
     match protocol {

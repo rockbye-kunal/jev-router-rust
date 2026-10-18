@@ -10,7 +10,7 @@ services:
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=32m
     networks: [backend]
-    stop_grace_period: 180s
+    stop_grace_period: 300s
   edge:
     image: caddy:2
     restart: unless-stopped

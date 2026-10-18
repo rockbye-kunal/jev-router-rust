@@ -8,7 +8,7 @@ Verified locally on 2026-10-18 on Apple Silicon macOS, using Rust 1.99.1. This i
 
 - `cargo fmt --check`: passed.
 - `cargo clippy --locked --all-targets -- -D warnings`: passed.
-- `cargo test --locked`: **81 passed, zero failed (80 system tests plus one executable integration scenario)**. See TEST-RESULTS.txt.
+- `cargo test --locked`: **94 passed, zero failed (93 system tests plus one executable integration scenario)**. See TEST-RESULTS.txt.
 - `cargo build --release --locked`: passed.
 - Production configuration validation and running release readiness check: passed.
 - Cargo audit: zero known RustSec vulnerabilities and no advisory warnings for the locked dependency graph. See DEPENDENCY-AUDIT.json. Used the official RustSec advisory database at commit `999ec89d5d3f10f20be14750ec8c2d8b44e0ac9b` with `--no-fetch`; the crates.io index was unavailable, so this does not establish a complete yanked-package check.
@@ -16,6 +16,10 @@ Verified locally on 2026-10-18 on Apple Silicon macOS, using Rust 1.99.1. This i
 Tests cover actual HTTP requests against local mock provider servers: routing and supported effort selection, hard exclusions, soft include fallback, dynamic model groups, capabilities, context/output bounds, tools, all three protocol adapters, fragmented SSE, model mismatch, total stream deadlines, cancellation, privacy, advisor bounds, tenant isolation, auth sanitization, public BYOK, CORS, atomic budgets, recovery, rate limits, outages and body limits.
 
 A fixture-only load run completed **100/100 requests with 16 concurrent callers**, in 282 ms with approximately 67 ms p95 latency, and no remaining active reservations. See LOAD-TEST.txt. These measurements exclude real inference and network latency and are not production throughput figures.
+
+## Follow-up recovery and quality result
+
+Empty/truncated non-stream output now has bounded recovery and persistent diagnostics. The latest complex request returned HTTP 200 with completed JSON, but its optimization answer **failed** independent constraint and global-optimum checks. It is not counted as a successful task. See [RECOVERY-FIX.md](RECOVERY-FIX.md) and [COMPLEX-RECOVERY-RESULTS.json](COMPLEX-RECOVERY-RESULTS.json).
 
 ## Live OpenRouter verification
 
