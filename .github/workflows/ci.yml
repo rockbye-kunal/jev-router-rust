@@ -1,0 +1,39 @@
+name: Rust verification
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --check
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo test --locked
+      - run: cargo build --release --locked
+      - run: JEV_ROUTER_E2E_BIN="$PWD/target/release/jev-router" cargo test --locked --test process_e2e
+      - run: cargo install cargo-audit --locked
+      - run: cargo audit
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t jev-router .
+      - name: Container readiness, public authentication and shutdown
+        run: |
+          docker run -d --name router-test -e BIND=0.0.0.0:8788 -p 127.0.0.1:18788:8788 jev-router
+          trap 'docker rm -f router-test' EXIT
+          ready=false
+          for attempt in $(seq 1 30); do
+            if docker exec router-test jev-router health; then ready=true; break; fi
+            sleep 2
+          done
+          if [ "$ready" != true ]; then docker logs router-test; exit 1; fi
+          status=$(curl -s -o /tmp/router-auth.json -w '%{http_code}' -H 'Content-Type: application/json' --data '{"messages":[{"role":"user","content":"PONG"}]}' http://127.0.0.1:18788/v1/chat/completions)
+          test "$status" = 401
+          docker stop --time 15 router-test
+          test "$(docker inspect --format '{{.State.ExitCode}}' router-test)" = 0

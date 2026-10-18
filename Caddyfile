@@ -1,0 +1,27 @@
+{
+    servers {
+        timeouts {
+            read_header 10s
+            read_body 15s
+            write 170s
+            idle 2m
+        }
+        max_header_size 16KiB
+    }
+}
+{$DOMAIN} {
+    request_body {
+        max_size 16MB
+    }
+    reverse_proxy router:8788 {
+        flush_interval -1
+        transport http {
+            read_timeout 135s
+            write_timeout 135s
+        }
+    }
+    header {
+        X-Content-Type-Options nosniff
+        Referrer-Policy no-referrer
+    }
+}

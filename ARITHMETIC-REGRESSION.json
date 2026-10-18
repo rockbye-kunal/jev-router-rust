@@ -1,0 +1,156 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "logprobs": null,
+      "message": {
+        "content": "The total cost is calculated as (3 × ₹80) + (2 × ₹15) = ₹240 + ₹30, resulting in a total ₹270.00.",
+        "refusal": null,
+        "role": "assistant"
+      },
+      "native_finish_reason": "STOP"
+    }
+  ],
+  "created": 1792271752,
+  "id": "gen-1792271752-5pbqE8KEOW9ZYBv3MNHB",
+  "model": "google/gemini-3-flash-preview",
+  "object": "chat.completion",
+  "openrouter_metadata": {
+    "pipeline": [
+      {
+        "data": {
+          "advisor_model": null,
+          "answer_review": {
+            "attempts": 2,
+            "cost": 0.0,
+            "model": "deterministic_money_total",
+            "status": "repaired"
+          },
+          "billing_exact": true,
+          "candidates": [
+            {
+              "estimated_cost": 0.00016229500000000002,
+              "model": "amazon/nova-micro-v1",
+              "supported_efforts": [
+                "none"
+              ]
+            },
+            {
+              "estimated_cost": 0.0,
+              "model": "google/gemma-4-26b-a4b-it:free",
+              "supported_efforts": [
+                "default"
+              ]
+            },
+            {
+              "estimated_cost": 0.00022043100000000002,
+              "model": "meta-llama/llama-3.2-1b-instruct",
+              "supported_efforts": [
+                "none"
+              ]
+            },
+            {
+              "estimated_cost": 0.0,
+              "model": "nvidia/nemotron-3.5-lightning:free",
+              "supported_efforts": [
+                "default"
+              ]
+            },
+            {
+              "estimated_cost": 0.00043664999999999996,
+              "model": "openai/gpt-5-nano",
+              "supported_efforts": [
+                "high",
+                "medium",
+                "low",
+                "minimal"
+              ]
+            },
+            {
+              "estimated_cost": 0.0002589,
+              "model": "qwen/qwen-2.5-7b-instruct",
+              "supported_efforts": [
+                "none"
+              ]
+            },
+            {
+              "estimated_cost": 7.284e-05,
+              "model": "sao10k/l3-lunaris-8b",
+              "supported_efforts": [
+                "none"
+              ]
+            },
+            {
+              "estimated_cost": 0.00059315,
+              "model": "z-ai/glm-5.3-flash",
+              "supported_efforts": [
+                "max",
+                "high",
+                "low"
+              ]
+            }
+          ],
+          "catalog_fetched_at": 1792269729,
+          "classifier_context": "bounded recent text and capability signals; full original request forwarded to generator",
+          "confidence": 1.0,
+          "control": "effort",
+          "effort": "medium",
+          "excluded_models": [],
+          "jev_cost": 0.0019884900000000003,
+          "jev_models": [
+            "typesafe/jev-1.13-20260917",
+            "typesafe/jev-1.13-20260917",
+            "typesafe/jev-1.13-20260917",
+            "typesafe/jev-1.13-20260917",
+            "typesafe/jev-1.13-20260917",
+            "typesafe/jev-1.13-20260917",
+            "typesafe/jev-1.13-20260917",
+            "typesafe/jev-1.13-20260917",
+            "typesafe/jev-1.13-20260917",
+            "typesafe/jev-1.13-20260917"
+          ],
+          "list_fallback": null,
+          "margin": 1.0,
+          "model": "google/gemini-3-flash-preview",
+          "models": [],
+          "pipeline": "default",
+          "policy": "independent Rust tournament policy",
+          "reason": "answer_repaired",
+          "request_id": "b3dec8ce-146d-456e-943e-b6e5c7e396bc",
+          "resolved_models": [
+            "google/gemini-3-flash-preview"
+          ],
+          "total_elapsed_ms": 6029
+        },
+        "name": "jev-router"
+      }
+    ]
+  },
+  "provider": "Google",
+  "service_tier": "provisioned",
+  "system_fingerprint": null,
+  "usage": {
+    "completion_tokens": 407,
+    "completion_tokens_details": {
+      "audio_tokens": 0,
+      "image_tokens": 0,
+      "reasoning_tokens": 364
+    },
+    "cost": 0.001268,
+    "cost_details": {
+      "upstream_inference_completions_cost": 0.001221,
+      "upstream_inference_cost": 0.001268,
+      "upstream_inference_prompt_cost": 4.7e-05
+    },
+    "is_byok": false,
+    "prompt_tokens": 94,
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cache_write_tokens": 0,
+      "cached_tokens": 0,
+      "video_tokens": 0
+    },
+    "total_tokens": 501
+  }
+}

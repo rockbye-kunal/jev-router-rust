@@ -1,0 +1,425 @@
+{
+  "cases": [
+    {
+      "model": "google/gemini-3-flash-preview",
+      "path": "/v1/chat/completions",
+      "routing": {
+        "pipeline": [
+          {
+            "data": {
+              "advisor_model": null,
+              "answer_review": {
+                "cost": 0.0,
+                "status": "no_deterministic_validator"
+              },
+              "billing_exact": true,
+              "candidates": [
+                {
+                  "estimated_cost": 0.009183,
+                  "model": "anthropic/claude-sonnet-4.6",
+                  "supported_efforts": [
+                    "max",
+                    "high",
+                    "medium",
+                    "low",
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0017865,
+                  "model": "google/gemini-3-flash-preview",
+                  "supported_efforts": [
+                    "high",
+                    "medium",
+                    "low",
+                    "minimal",
+                    "none"
+                  ]
+                }
+              ],
+              "catalog_fetched_at": 1792269729,
+              "classifier_context": "bounded recent text and capability signals; full original request forwarded to generator",
+              "confidence": 0.92,
+              "control": "effort",
+              "effort": "none",
+              "excluded_models": [],
+              "jev_cost": 0.000065562,
+              "jev_models": [
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917"
+              ],
+              "list_fallback": null,
+              "margin": 0.91,
+              "model": "google/gemini-3-flash-preview",
+              "models": [
+                "google/gemini-3-flash-preview",
+                "anthropic/claude-sonnet-4.6"
+              ],
+              "pipeline": "default",
+              "policy": "independent Rust tournament policy",
+              "reason": "jev",
+              "request_id": "2b796a6c-79e1-4df9-9f84-18e10c00b62e",
+              "resolved_models": [
+                "google/gemini-3-flash-preview"
+              ],
+              "routing_elapsed_ms": 1732,
+              "total_elapsed_ms": 2003
+            },
+            "name": "jev-router"
+          }
+        ]
+      },
+      "usage": {
+        "completion_tokens": 2,
+        "completion_tokens_details": {
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "reasoning_tokens": 0
+        },
+        "cost": 0.00001,
+        "cost_details": {
+          "upstream_inference_completions_cost": 6e-6,
+          "upstream_inference_cost": 0.00001,
+          "upstream_inference_prompt_cost": 4e-6
+        },
+        "is_byok": false,
+        "prompt_tokens": 8,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "video_tokens": 0
+        },
+        "total_tokens": 10
+      }
+    },
+    {
+      "model": "google/gemini-3-flash-preview",
+      "path": "/v1/responses",
+      "routing": {
+        "pipeline": [
+          {
+            "data": {
+              "advisor_model": null,
+              "answer_review": {
+                "cost": 0.0,
+                "status": "no_deterministic_validator"
+              },
+              "billing_exact": true,
+              "candidates": [
+                {
+                  "estimated_cost": 0.0017515,
+                  "model": "google/gemini-3-flash-preview",
+                  "supported_efforts": [
+                    "high",
+                    "medium",
+                    "low",
+                    "minimal",
+                    "none"
+                  ]
+                }
+              ],
+              "catalog_fetched_at": 1792269729,
+              "classifier_context": "bounded recent text and capability signals; full original request forwarded to generator",
+              "confidence": 0.96,
+              "control": "effort",
+              "effort": "none",
+              "excluded_models": [],
+              "jev_cost": 0.00006006,
+              "jev_models": [
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917"
+              ],
+              "list_fallback": null,
+              "margin": 0.95,
+              "model": "google/gemini-3-flash-preview",
+              "models": [
+                "google/gemini-3-flash-preview"
+              ],
+              "pipeline": "default",
+              "policy": "independent Rust tournament policy",
+              "reason": "jev",
+              "request_id": "acd2e425-78f1-4080-88a8-011f518478af",
+              "resolved_models": [
+                "google/gemini-3-flash-preview"
+              ],
+              "routing_elapsed_ms": 1767,
+              "total_elapsed_ms": 1840
+            },
+            "name": "jev-router"
+          }
+        ]
+      },
+      "usage": {
+        "cost": 0.0000115,
+        "cost_details": {
+          "upstream_inference_cost": 0.0000115,
+          "upstream_inference_input_cost": 2.5e-6,
+          "upstream_inference_output_cost": 9e-6
+        },
+        "input_tokens": 5,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "is_byok": false,
+        "output_tokens": 3,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 8
+      }
+    },
+    {
+      "model": "anthropic/claude-sonnet-4.6",
+      "path": "/v1/messages",
+      "routing": {
+        "pipeline": [
+          {
+            "data": {
+              "advisor_model": null,
+              "answer_review": {
+                "cost": 0.0,
+                "status": "no_deterministic_validator"
+              },
+              "billing_exact": true,
+              "candidates": [
+                {
+                  "estimated_cost": 0.009039,
+                  "model": "anthropic/claude-sonnet-4.6",
+                  "supported_efforts": [
+                    "max",
+                    "high",
+                    "medium",
+                    "low",
+                    "none"
+                  ]
+                }
+              ],
+              "catalog_fetched_at": 1792269729,
+              "classifier_context": "bounded recent text and capability signals; full original request forwarded to generator",
+              "confidence": 0.99,
+              "control": "effort",
+              "effort": "none",
+              "excluded_models": [],
+              "jev_cost": 0.000061068,
+              "jev_models": [
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917"
+              ],
+              "list_fallback": null,
+              "margin": 0.98,
+              "model": "anthropic/claude-sonnet-4.6",
+              "models": [
+                "anthropic/claude-sonnet-4.6"
+              ],
+              "pipeline": "default",
+              "policy": "independent Rust tournament policy",
+              "reason": "jev",
+              "request_id": "0e539b50-1493-4572-9ebe-b14ce1efb964",
+              "resolved_models": [
+                "anthropic/claude-sonnet-4.6"
+              ],
+              "routing_elapsed_ms": 2173,
+              "total_elapsed_ms": 2173
+            },
+            "name": "jev-router"
+          }
+        ]
+      },
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cost": 0.000144,
+        "cost_details": {
+          "upstream_inference_completions_cost": 0.000105,
+          "upstream_inference_cost": 0.000144,
+          "upstream_inference_prompt_cost": 0.000039
+        },
+        "inference_geo": "global",
+        "input_tokens": 13,
+        "is_byok": false,
+        "output_tokens": 7,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "server_tool_use": null,
+        "service_tier": "standard",
+        "speed": "standard"
+      }
+    },
+    {
+      "model": "anthropic/claude-sonnet-4.6",
+      "path": "/v1/chat/completions",
+      "routing": {
+        "pipeline": [
+          {
+            "data": {
+              "advisor_model": null,
+              "answer_review": {
+                "cost": 0.0,
+                "status": "no_deterministic_validator"
+              },
+              "billing_exact": true,
+              "candidates": [
+                {
+                  "estimated_cost": 0.017538,
+                  "model": "anthropic/claude-sonnet-4.6",
+                  "supported_efforts": [
+                    "max",
+                    "high",
+                    "medium",
+                    "low",
+                    "none"
+                  ]
+                }
+              ],
+              "catalog_fetched_at": 1792269729,
+              "classifier_context": "bounded recent text and capability signals; full original request forwarded to generator",
+              "confidence": 0.77,
+              "control": "effort",
+              "effort": "low",
+              "excluded_models": [],
+              "jev_cost": 0.000060648,
+              "jev_models": [
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917"
+              ],
+              "list_fallback": null,
+              "margin": 0.6799999999999999,
+              "model": "anthropic/claude-sonnet-4.6",
+              "models": [
+                "anthropic/claude-sonnet-4.6"
+              ],
+              "pipeline": "default",
+              "policy": "independent Rust tournament policy",
+              "reason": "jev",
+              "request_id": "e53ef227-6e87-4f06-915f-8a191c5595a6",
+              "resolved_models": [
+                "anthropic/claude-sonnet-4.6"
+              ],
+              "routing_elapsed_ms": 2158,
+              "total_elapsed_ms": 2158
+            },
+            "name": "jev-router"
+          }
+        ]
+      },
+      "usage": {
+        "completion_tokens": 34,
+        "completion_tokens_details": {
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "reasoning_tokens": 0
+        },
+        "cost": 0.002508,
+        "cost_details": {
+          "upstream_inference_completions_cost": 0.00051,
+          "upstream_inference_cost": 0.002508,
+          "upstream_inference_prompt_cost": 0.001998
+        },
+        "is_byok": false,
+        "prompt_tokens": 666,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "video_tokens": 0
+        },
+        "total_tokens": 700
+      }
+    },
+    {
+      "model": "google/gemini-3-flash-preview",
+      "path": "/v1/chat/completions",
+      "routing": {
+        "pipeline": [
+          {
+            "data": {
+              "advisor_model": null,
+              "answer_review": {
+                "cost": 0.0,
+                "status": "structured_not_reviewed"
+              },
+              "billing_exact": true,
+              "candidates": [
+                {
+                  "estimated_cost": 0.0033965,
+                  "model": "google/gemini-3-flash-preview",
+                  "supported_efforts": [
+                    "high",
+                    "medium",
+                    "low",
+                    "minimal",
+                    "none"
+                  ]
+                }
+              ],
+              "catalog_fetched_at": 1792269729,
+              "classifier_context": "bounded recent text and capability signals; full original request forwarded to generator",
+              "confidence": 0.8,
+              "control": "effort",
+              "effort": "none",
+              "excluded_models": [],
+              "jev_cost": 0.000059472,
+              "jev_models": [
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917"
+              ],
+              "list_fallback": null,
+              "margin": 0.77,
+              "model": "google/gemini-3-flash-preview",
+              "models": [
+                "google/gemini-3-flash-preview"
+              ],
+              "pipeline": "default",
+              "policy": "independent Rust tournament policy",
+              "reason": "jev",
+              "request_id": "06fc0a85-b301-4032-8124-7f5fb8a8c700",
+              "resolved_models": [
+                "google/gemini-3-flash-preview"
+              ],
+              "routing_elapsed_ms": 1871,
+              "total_elapsed_ms": 2021
+            },
+            "name": "jev-router"
+          }
+        ]
+      },
+      "usage": {
+        "completion_tokens": 5,
+        "completion_tokens_details": {
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "reasoning_tokens": 0
+        },
+        "cost": 0.0000395,
+        "cost_details": {
+          "upstream_inference_completions_cost": 0.000015,
+          "upstream_inference_cost": 0.0000395,
+          "upstream_inference_prompt_cost": 0.0000245
+        },
+        "is_byok": false,
+        "prompt_tokens": 49,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "video_tokens": 0
+        },
+        "total_tokens": 54
+      }
+    },
+    {
+      "completion_verified": true,
+      "path": "/v1/chat/completions",
+      "reported_cost": 0.0000115,
+      "stream": true
+    }
+  ],
+  "status": "passed"
+}

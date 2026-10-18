@@ -1,0 +1,9 @@
+/target/
+/data/
+.env
+.env.*
+!.env.example
+*.db*
+*.lock.tmp
+/LIVE-SMOKE-LOG.txt
+/AUTO-ROUTING-LOG.txt

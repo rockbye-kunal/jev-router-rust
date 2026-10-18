@@ -1,0 +1,854 @@
+{
+  "automatic_no_model_preferences": true,
+  "case_delay_ms": 5000,
+  "cases": [
+    {
+      "answer": "PONG",
+      "model": "amazon/nova-micro-v1",
+      "path": "/v1/chat/completions",
+      "routing": {
+        "pipeline": [
+          {
+            "data": {
+              "advisor_model": null,
+              "answer_review": {
+                "cost": 0.0,
+                "status": "no_deterministic_validator"
+              },
+              "billing_exact": true,
+              "candidates": [
+                {
+                  "estimated_cost": 0.00008491,
+                  "model": "amazon/nova-micro-v1",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0000701,
+                  "model": "google/gemma-3-4b-it",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.000113118,
+                  "model": "meta-llama/llama-3.2-1b-instruct",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0002426,
+                  "model": "openai/gpt-4.1-nano",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0002237,
+                  "model": "openai/gpt-5-nano",
+                  "supported_efforts": [
+                    "high",
+                    "medium",
+                    "low",
+                    "minimal"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0001402,
+                  "model": "qwen/qwen-2.5-7b-instruct",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.00004072,
+                  "model": "sao10k/l3-lunaris-8b",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.000227669,
+                  "model": "z-ai/glm-4.7-flash",
+                  "supported_efforts": [
+                    "default"
+                  ]
+                }
+              ],
+              "catalog_fetched_at": 1792272386,
+              "classifier_context": "bounded recent text and capability signals; full original request forwarded to generator",
+              "confidence": 1.0,
+              "control": "omit",
+              "effort": "none",
+              "excluded_models": [],
+              "jev_cost": 0.0019836180000000004,
+              "jev_models": [
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917"
+              ],
+              "list_fallback": null,
+              "margin": 1.0,
+              "model": "amazon/nova-micro-v1",
+              "models": [],
+              "pipeline": "default",
+              "policy": "independent Rust tournament policy",
+              "reason": "adequacy_confirmed",
+              "request_id": "512f556d-81df-4d57-a417-cab7411ba0ab",
+              "resolved_models": [
+                "amazon/nova-micro-v1"
+              ],
+              "routing_elapsed_ms": 4253,
+              "total_elapsed_ms": 4253
+            },
+            "name": "jev-router"
+          }
+        ]
+      },
+      "tool_calls": null,
+      "usage": {
+        "completion_tokens": 3,
+        "completion_tokens_details": {
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "reasoning_tokens": 0
+        },
+        "cost": 7e-7,
+        "cost_details": {
+          "upstream_inference_completions_cost": 4.2e-7,
+          "upstream_inference_cost": 7e-7,
+          "upstream_inference_prompt_cost": 2.8e-7
+        },
+        "is_byok": false,
+        "prompt_tokens": 8,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "video_tokens": 0
+        },
+        "total_tokens": 11
+      }
+    },
+    {
+      "answer": "PONG",
+      "model": "amazon/nova-micro-v1",
+      "path": "/v1/responses",
+      "routing": {
+        "pipeline": [
+          {
+            "data": {
+              "advisor_model": null,
+              "answer_review": {
+                "cost": 0.0,
+                "status": "no_deterministic_validator"
+              },
+              "billing_exact": true,
+              "candidates": [
+                {
+                  "estimated_cost": 0.00008351,
+                  "model": "amazon/nova-micro-v1",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0000681,
+                  "model": "google/gemma-3-4b-it",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.000112038,
+                  "model": "meta-llama/llama-3.2-1b-instruct",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0002386,
+                  "model": "openai/gpt-4.1-nano",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0002217,
+                  "model": "openai/gpt-5-nano",
+                  "supported_efforts": [
+                    "high",
+                    "medium",
+                    "low",
+                    "minimal"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0001362,
+                  "model": "qwen/qwen-2.5-7b-instruct",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.000085,
+                  "model": "rekaai/reka-edge",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.000225249,
+                  "model": "z-ai/glm-4.7-flash",
+                  "supported_efforts": [
+                    "default"
+                  ]
+                }
+              ],
+              "catalog_fetched_at": 1792272386,
+              "classifier_context": "bounded recent text and capability signals; full original request forwarded to generator",
+              "confidence": 1.0,
+              "control": "omit",
+              "effort": "none",
+              "excluded_models": [],
+              "jev_cost": 0.001996722,
+              "jev_models": [
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917"
+              ],
+              "list_fallback": null,
+              "margin": 1.0,
+              "model": "amazon/nova-micro-v1",
+              "models": [],
+              "pipeline": "default",
+              "policy": "independent Rust tournament policy",
+              "reason": "adequacy_confirmed",
+              "request_id": "a56fa28e-a6b3-4f1e-ae3f-b1849a874c54",
+              "resolved_models": [
+                "amazon/nova-micro-v1"
+              ],
+              "routing_elapsed_ms": 2833,
+              "total_elapsed_ms": 2870
+            },
+            "name": "jev-router"
+          }
+        ]
+      },
+      "tool_calls": null,
+      "usage": {
+        "cost": 5.95e-7,
+        "cost_details": {
+          "upstream_inference_cost": 5.95e-7,
+          "upstream_inference_input_cost": 1.75e-7,
+          "upstream_inference_output_cost": 4.2e-7
+        },
+        "input_tokens": 5,
+        "input_tokens_details": {
+          "cache_write_tokens": 0,
+          "cached_tokens": 0
+        },
+        "is_byok": false,
+        "output_tokens": 3,
+        "output_tokens_details": {
+          "reasoning_tokens": 0
+        },
+        "total_tokens": 8
+      }
+    },
+    {
+      "answer": "PONG",
+      "model": "amazon/nova-micro-v1",
+      "path": "/v1/messages",
+      "routing": {
+        "pipeline": [
+          {
+            "data": {
+              "advisor_model": null,
+              "answer_review": {
+                "cost": 0.0,
+                "status": "no_deterministic_validator"
+              },
+              "billing_exact": true,
+              "candidates": [
+                {
+                  "estimated_cost": 0.00008435,
+                  "model": "amazon/nova-micro-v1",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0000693,
+                  "model": "google/gemma-3-4b-it",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.000112686,
+                  "model": "meta-llama/llama-3.2-1b-instruct",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.000241,
+                  "model": "openai/gpt-4.1-nano",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0002229,
+                  "model": "openai/gpt-5-nano",
+                  "supported_efforts": [
+                    "high",
+                    "medium",
+                    "low",
+                    "minimal"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0001386,
+                  "model": "qwen/qwen-2.5-7b-instruct",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0000874,
+                  "model": "rekaai/reka-edge",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.000226701,
+                  "model": "z-ai/glm-4.7-flash",
+                  "supported_efforts": [
+                    "default"
+                  ]
+                }
+              ],
+              "catalog_fetched_at": 1792272386,
+              "classifier_context": "bounded recent text and capability signals; full original request forwarded to generator",
+              "confidence": 1.0,
+              "control": "omit",
+              "effort": "none",
+              "excluded_models": [],
+              "jev_cost": 0.001973076,
+              "jev_models": [
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917"
+              ],
+              "list_fallback": null,
+              "margin": 1.0,
+              "model": "amazon/nova-micro-v1",
+              "models": [],
+              "pipeline": "default",
+              "policy": "independent Rust tournament policy",
+              "reason": "adequacy_confirmed",
+              "request_id": "4c73e40d-b17c-4ce5-a482-fd6cc58938b9",
+              "resolved_models": [
+                "amazon/nova-micro-v1"
+              ],
+              "routing_elapsed_ms": 2470,
+              "total_elapsed_ms": 2470
+            },
+            "name": "jev-router"
+          }
+        ]
+      },
+      "tool_calls": null,
+      "usage": {
+        "cache_creation": null,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "cost": 5.95e-7,
+        "cost_details": {
+          "upstream_inference_completions_cost": 4.2e-7,
+          "upstream_inference_cost": 5.95e-7,
+          "upstream_inference_prompt_cost": 1.75e-7
+        },
+        "inference_geo": null,
+        "input_tokens": 5,
+        "is_byok": false,
+        "output_tokens": 3,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "server_tool_use": null,
+        "service_tier": null,
+        "speed": "standard"
+      }
+    },
+    {
+      "answer": "",
+      "model": "openai/gpt-5-nano",
+      "path": "/v1/chat/completions",
+      "routing": {
+        "pipeline": [
+          {
+            "data": {
+              "advisor_model": null,
+              "answer_review": {
+                "cost": 0.0,
+                "status": "no_deterministic_validator"
+              },
+              "billing_exact": true,
+              "candidates": [
+                {
+                  "estimated_cost": 0.005773,
+                  "model": "anthropic/claude-haiku-4.5",
+                  "supported_efforts": [
+                    "default"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.00169925,
+                  "model": "google/gemini-3.1-flash-lite",
+                  "supported_efforts": [
+                    "high",
+                    "medium",
+                    "low",
+                    "minimal",
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0007123499999999999,
+                  "model": "openai/gpt-4o-mini",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.00044225,
+                  "model": "openai/gpt-5-nano",
+                  "supported_efforts": [
+                    "high",
+                    "medium",
+                    "low",
+                    "minimal"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0002701,
+                  "model": "qwen/qwen-2.5-7b-instruct",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0004491065,
+                  "model": "z-ai/glm-4.7-flash",
+                  "supported_efforts": [
+                    "default"
+                  ]
+                }
+              ],
+              "catalog_fetched_at": 1792272386,
+              "classifier_context": "bounded recent text and capability signals; full original request forwarded to generator",
+              "confidence": 0.71,
+              "control": "effort",
+              "effort": "low",
+              "excluded_models": [],
+              "jev_cost": 0.001644972,
+              "jev_models": [
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917"
+              ],
+              "list_fallback": null,
+              "margin": 0.5700000000000001,
+              "model": "openai/gpt-5-nano",
+              "models": [],
+              "pipeline": "default",
+              "policy": "independent Rust tournament policy",
+              "reason": "adequacy_confirmed",
+              "request_id": "57c24782-7877-42df-8529-220e6ea5e70f",
+              "resolved_models": [
+                "openai/gpt-5-nano"
+              ],
+              "routing_elapsed_ms": 3489,
+              "total_elapsed_ms": 4617
+            },
+            "name": "jev-router"
+          }
+        ]
+      },
+      "tool_calls": [
+        {
+          "function": {
+            "arguments": "{\"city\":\"Pune\"}",
+            "name": "get_weather"
+          },
+          "id": "call_1w3V96LFrrD9wMMsCew1cMV3",
+          "index": 0,
+          "type": "function"
+        }
+      ],
+      "usage": {
+        "completion_tokens": 66,
+        "completion_tokens_details": {
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "reasoning_tokens": 94
+        },
+        "cost": 0.00002865,
+        "cost_details": {
+          "upstream_inference_completions_cost": 0.0000264,
+          "upstream_inference_cost": 0.00002865,
+          "upstream_inference_prompt_cost": 2.25e-6
+        },
+        "is_byok": false,
+        "prompt_tokens": 45,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "video_tokens": 0
+        },
+        "total_tokens": 111
+      }
+    },
+    {
+      "answer": "{\"ok\": true}",
+      "model": "mistralai/mistral-small-24b-instruct-2501",
+      "path": "/v1/chat/completions",
+      "routing": {
+        "pipeline": [
+          {
+            "data": {
+              "advisor_model": null,
+              "answer_review": {
+                "cost": 0.0,
+                "status": "structured_not_reviewed"
+              },
+              "billing_exact": true,
+              "candidates": [
+                {
+                  "estimated_cost": 0.002847,
+                  "model": "anthropic/claude-haiku-5.5",
+                  "supported_efforts": [
+                    "max",
+                    "xhigh",
+                    "high",
+                    "medium",
+                    "low",
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0016795,
+                  "model": "google/gemini-3.1-flash-lite-preview",
+                  "supported_efforts": [
+                    "high",
+                    "medium",
+                    "low",
+                    "minimal",
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.00011062,
+                  "model": "mistralai/mistral-small-24b-instruct-2501",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0007005,
+                  "model": "openai/gpt-4o-mini-2024-07-18",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.005137,
+                  "model": "openai/o4-mini",
+                  "supported_efforts": [
+                    "default"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0002335,
+                  "model": "upstage/solar-mini4",
+                  "supported_efforts": [
+                    "max",
+                    "xhigh",
+                    "high",
+                    "medium",
+                    "low",
+                    "minimal",
+                    "none"
+                  ]
+                }
+              ],
+              "catalog_fetched_at": 1792272386,
+              "classifier_context": "bounded recent text and capability signals; full original request forwarded to generator",
+              "confidence": 0.98,
+              "control": "omit",
+              "effort": "none",
+              "excluded_models": [],
+              "jev_cost": 0.0031775939999999997,
+              "jev_models": [
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917"
+              ],
+              "list_fallback": "models_ignored",
+              "margin": 0.98,
+              "model": "mistralai/mistral-small-24b-instruct-2501",
+              "models": [],
+              "pipeline": "default",
+              "policy": "independent Rust tournament policy",
+              "reason": "endpoint_fallback:adequacy_confirmed",
+              "request_id": "e89970ba-b76e-40ce-bba2-c24c51ff45b0",
+              "resolved_models": [
+                "mistralai/mistral-small-24b-instruct-2501"
+              ],
+              "routing_elapsed_ms": 4240,
+              "total_elapsed_ms": 4763
+            },
+            "name": "jev-router"
+          }
+        ]
+      },
+      "tool_calls": null,
+      "usage": {
+        "completion_tokens": 6,
+        "completion_tokens_details": {
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "reasoning_tokens": 0
+        },
+        "cost": 8.83e-6,
+        "cost_details": {
+          "upstream_inference_completions_cost": 4.8e-7,
+          "upstream_inference_cost": 8.83e-6,
+          "upstream_inference_prompt_cost": 8.35e-6
+        },
+        "is_byok": false,
+        "prompt_tokens": 167,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "video_tokens": 0
+        },
+        "total_tokens": 173
+      }
+    },
+    {
+      "answer": "The total is calculated as (3 × ₹80) + (2 × ₹15) = ₹240 + ₹30, resulting in a total ₹270.00.",
+      "model": "google/gemini-3-flash-preview",
+      "path": "/v1/chat/completions",
+      "routing": {
+        "pipeline": [
+          {
+            "data": {
+              "advisor_model": null,
+              "answer_review": {
+                "attempts": 2,
+                "cost": 0.0,
+                "model": "deterministic_money_total",
+                "status": "repaired"
+              },
+              "billing_exact": true,
+              "candidates": [
+                {
+                  "estimated_cost": 0.00016002,
+                  "model": "amazon/nova-micro-v1",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0001262,
+                  "model": "google/gemma-3-4b-it",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.000218676,
+                  "model": "meta-llama/llama-3.2-1b-instruct",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0004572,
+                  "model": "openai/gpt-4.1-nano",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0004334,
+                  "model": "openai/gpt-5-nano",
+                  "supported_efforts": [
+                    "high",
+                    "medium",
+                    "low",
+                    "minimal"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0002524,
+                  "model": "qwen/qwen-2.5-7b-instruct",
+                  "supported_efforts": [
+                    "none"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.0002524,
+                  "model": "rekaai/reka-flash-3",
+                  "supported_efforts": [
+                    "default"
+                  ]
+                },
+                {
+                  "estimated_cost": 0.000438398,
+                  "model": "z-ai/glm-4.7-flash",
+                  "supported_efforts": [
+                    "default"
+                  ]
+                }
+              ],
+              "catalog_fetched_at": 1792272386,
+              "classifier_context": "bounded recent text and capability signals; full original request forwarded to generator",
+              "confidence": 1.0,
+              "control": "effort",
+              "effort": "medium",
+              "excluded_models": [],
+              "jev_cost": 0.001990758,
+              "jev_models": [
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917",
+                "typesafe/jev-1.13-20260917"
+              ],
+              "list_fallback": null,
+              "margin": 1.0,
+              "model": "google/gemini-3-flash-preview",
+              "models": [],
+              "pipeline": "default",
+              "policy": "independent Rust tournament policy",
+              "reason": "answer_repaired",
+              "request_id": "6b728bb2-763d-48c3-b1fc-be7f13b7fc84",
+              "resolved_models": [
+                "google/gemini-3-flash-preview"
+              ],
+              "total_elapsed_ms": 7482
+            },
+            "name": "jev-router"
+          }
+        ]
+      },
+      "tool_calls": null,
+      "usage": {
+        "completion_tokens": 320,
+        "completion_tokens_details": {
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "reasoning_tokens": 278
+        },
+        "cost": 0.001007,
+        "cost_details": {
+          "upstream_inference_completions_cost": 0.00096,
+          "upstream_inference_cost": 0.001007,
+          "upstream_inference_prompt_cost": 0.000047
+        },
+        "is_byok": false,
+        "prompt_tokens": 94,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "video_tokens": 0
+        },
+        "total_tokens": 414
+      }
+    },
+    {
+      "completion_verified": true,
+      "effort": "none",
+      "model": "amazon/nova-micro-v1",
+      "path": "/v1/chat/completions",
+      "reported_cost": 0.0,
+      "stream": true
+    },
+    {
+      "completion_verified": true,
+      "effort": "none",
+      "model": "amazon/nova-micro-v1",
+      "path": "/v1/responses",
+      "reported_cost": 5.95e-7,
+      "stream": true
+    },
+    {
+      "completion_verified": true,
+      "effort": "none",
+      "model": "amazon/nova-micro-v1",
+      "path": "/v1/messages",
+      "reported_cost": 5.95e-7,
+      "stream": true
+    }
+  ],
+  "error": null,
+  "error_message": null,
+  "status": "passed"
+}

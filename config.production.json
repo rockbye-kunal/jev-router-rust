@@ -1,0 +1,22 @@
+{
+  "bind": "0.0.0.0:8788",
+  "database": "data/router.db",
+  "catalog": "data/catalog.json",
+  "data_collection": "deny",
+  "zdr": false,
+  "daily_estimated_budget_usd": 10,
+  "max_request_estimated_usd": 1,
+  "tenant_concurrent": 4,
+  "requests_per_minute": 60,
+  "max_concurrent": 32,
+  "request_timeout_secs": 120,
+  "catalog_max_age_secs": 3600,
+  "fallback_model": "anthropic/claude-sonnet-4.6",
+  "repair_model": "google/gemini-3-flash-preview",
+  "verify_text_answers": true,
+  "model_answer_review": false,
+  "jev_model": "typesafe/jev-1.13",
+  "advisor_model": null,
+  "hard_allowed_models": [],
+  "hard_excluded_models": []
+}

@@ -1,0 +1,31 @@
+services:
+  router:
+    build: .
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - router_data:/app/data
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    networks: [backend]
+    stop_grace_period: 180s
+  edge:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN to your public DNS hostname}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [backend]
+    depends_on: [router]
+volumes:
+  router_data:
+  caddy_data:
+  caddy_config:
+networks:
+  backend:
