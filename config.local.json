@@ -26,10 +26,11 @@
     "cheap": [
       "google/gemini-*-flash-lite*",
       "openai/gpt-5*-nano",
+      "openai/gpt-4.1-nano",
       "amazon/nova-micro-v1",
-      "mistralai/ministral-8b*",
-      "meta-llama/llama-3.1-8b-instruct",
-      "openai/gpt-4.1-nano"
+      "amazon/nova-lite-v1",
+      "openai/gpt-4o-mini",
+      "x-ai/grok-*-fast*"
     ],
     "medium": [
       "google/gemini-3-flash-preview",
