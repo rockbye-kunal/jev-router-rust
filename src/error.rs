@@ -40,16 +40,20 @@ impl Error {
 }
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
-        if self.status.is_server_error() {
+        let request_id = self.routing.as_ref().map(|r| r.0.as_str()).unwrap_or("");
+        // Server-side failures and our own deadlines (408/504) need operator attention.
+        if self.status.is_server_error() || self.status.as_u16() == 408 {
             tracing::warn!(
                 status = self.status.as_u16(),
                 code = self.code,
+                request_id,
                 "error_response"
             );
         } else {
             tracing::debug!(
                 status = self.status.as_u16(),
                 code = self.code,
+                request_id,
                 "error_response"
             );
         }

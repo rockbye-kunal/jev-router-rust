@@ -191,16 +191,23 @@ pub fn app(s: AppState) -> Router {
                 };
                 // For streams this is time to response headers, not stream completion;
                 // completion and cost are in /v1/requests/{id}.
-                tracing::info!(
-                    method = %method,
-                    path = %path,
-                    status = response.status().as_u16(),
-                    request_id = %header("x-request-id"),
-                    model = %header("x-jev-model"),
-                    effort = %header("x-jev-effort"),
-                    header_ms = received.elapsed().as_millis() as u64,
-                    "request"
-                );
+                let status = response.status().as_u16();
+                let header_ms = received.elapsed().as_millis() as u64;
+                // Successful health probes (every 30 s from Docker) stay at debug level.
+                if status < 400 && (path == "/healthz" || path == "/readyz") {
+                    tracing::debug!(method = %method, path = %path, status, header_ms, "request");
+                } else {
+                    tracing::info!(
+                        method = %method,
+                        path = %path,
+                        status,
+                        request_id = %header("x-request-id"),
+                        model = %header("x-jev-model"),
+                        effort = %header("x-jev-effort"),
+                        header_ms,
+                        "request"
+                    );
+                }
                 response
             }
         },

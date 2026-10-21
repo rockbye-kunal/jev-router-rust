@@ -31,7 +31,7 @@ offline() {
 
 live() {
   local bin="$PWD/target/release/jev-router"
-  [ -x "$bin" ] || { step "Release build"; cargo build --release --locked; }
+  step "Release build (incremental)"; cargo build --release --locked
   if [ -z "${OPENROUTER_API_KEY:-}" ] && ! grep -qE '^OPENROUTER_API_KEY=.+' .env 2>/dev/null; then
     fail "OPENROUTER_API_KEY is not set in the environment or .env"
   fi
@@ -50,8 +50,9 @@ live() {
 {"bind":"127.0.0.1:${port}","database":"${work}/router.db","catalog":"${work}/catalog.json"}
 JSON
 
+  if curl -fsS "${base}/healthz" >/dev/null 2>&1; then fail "port ${port} already in use; stop that process or set JEV_IT_PORT"; fi
   step "Starting router on ${base} (logs: ${work}/server.log)"
-  "$bin" --config "$work/config.json" serve >"$work/server.out" 2>"$work/server.log" &
+  BIND="127.0.0.1:${port}" "$bin" --config "$work/config.json" serve >"$work/server.out" 2>"$work/server.log" &
   server_pid=$!
 
   local ready=false
@@ -68,9 +69,9 @@ JSON
   status=$(curl -sS -o "$work/answer.json" -D "$work/headers.txt" -w '%{http_code}' \
     -H 'Content-Type: application/json' -H 'X-OpenRouter-Metadata: enabled' \
     --max-time 280 \
-    --data '{"model":"auto","messages":[{"role":"user","content":"A shop sells 3 notebooks at ₹80 each and 2 pens at ₹15 each. What is the total? Give the calculation and final amount in one short sentence."}],"max_tokens":1024}' \
+    --data '{"model":"auto","messages":[{"role":"user","content":"A shop sells 3 notebooks at ₹80 each and 2 pens at ₹15 each. What is the total? Give the calculation and final amount in one short sentence."}],"max_tokens":4096}' \
     "${base}/v1/chat/completions")
-  header() { grep -i "^$1:" "$work/headers.txt" | head -1 | cut -d' ' -f2- | tr -d '\r'; }
+  header() { grep -i "^$1:" "$work/headers.txt" | head -1 | cut -d' ' -f2- | tr -d '\r' || true; }
   local request_id model effort reason
   request_id="$(header x-request-id)"; model="$(header x-jev-model)"
   effort="$(header x-jev-effort)"; reason="$(header x-jev-reason)"
@@ -78,7 +79,7 @@ JSON
   [ "$status" = 200 ] || { cat "$work/answer.json" >&2; fail "expected HTTP 200"; }
   [ -n "$request_id" ] && [ -n "$model" ] || fail "routing headers missing"
   local content
-  content="$(grep -o '"content":"[^"]*"' "$work/answer.json" | head -1)"
+  content="$(grep -o '"content":"[^"]*"' "$work/answer.json" | head -1 || true)"
   printf '%s' "$content" | grep -q '270' || { cat "$work/answer.json" >&2; fail "answer does not contain the total 270"; }
   grep -q 'deterministic_money_total' "$work/answer.json" \
     || echo "note: metadata does not name the exact validator; inspect answer_review below"

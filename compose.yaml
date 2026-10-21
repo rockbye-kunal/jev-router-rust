@@ -11,6 +11,9 @@ services:
       - /tmp:rw,noexec,nosuid,size=32m
     networks: [backend]
     stop_grace_period: 300s
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}
   edge:
     image: caddy:2
     restart: unless-stopped
@@ -23,6 +26,10 @@ services:
       - caddy_config:/config
     networks: [backend]
     depends_on: [router]
+    stop_grace_period: 300s
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}
 volumes:
   router_data:
   caddy_data:

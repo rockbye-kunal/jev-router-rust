@@ -47,6 +47,7 @@ enum Command {
 async fn main() {
     init_logging();
     if let Err(e) = run().await {
+        tracing::error!(code = e.code, message = %e.message, "fatal");
         eprintln!("{}: {}", e.code, e.message);
         std::process::exit(1);
     }

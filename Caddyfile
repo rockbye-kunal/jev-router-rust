@@ -1,4 +1,6 @@
 {
+    # Drain in-flight generations on reload/stop instead of cutting them (billed upstream).
+    grace_period 290s
     servers {
         timeouts {
             read_header 10s
