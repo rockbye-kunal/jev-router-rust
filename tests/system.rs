@@ -2557,3 +2557,24 @@ fn tiered_pool_is_off_without_tiers_and_validates_cap() {
     bad.pool_per_tier = 6;
     bad.validate().unwrap();
 }
+#[test]
+fn recency_rule_excludes_old_releases_everywhere() {
+    let now = jev_router::config::now();
+    let models = vec![
+        priced("v/old", 0.000001, now - 400 * 86400),
+        priced("v/new", 0.000001, now - 30 * 86400),
+        priced("v/undated", 0.000001, 0),
+    ];
+    let registry = catalog(&models);
+    let cfg = Config {
+        max_model_age_days: 365,
+        ..Config::default()
+    };
+    cfg.validate().unwrap();
+    let task = plain_task(&cfg);
+    let (eligible, _) = policy::eligible(&task, &registry, &cfg).unwrap();
+    let ids = eligible.iter().map(|m| m.id.as_str()).collect::<Vec<_>>();
+    assert_eq!(ids, ["v/new", "v/undated"]);
+    let off = Config::default();
+    assert_eq!(policy::eligible(&task, &registry, &off).unwrap().0.len(), 3);
+}

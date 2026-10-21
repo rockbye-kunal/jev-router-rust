@@ -396,6 +396,11 @@ pub fn eligible(task: &Task, registry: &Registry, cfg: &Config) -> Result<(Vec<M
                         .iter()
                         .any(|p| p == "response_format" || p == "structured_outputs"))
                 && m.estimate(task.input_bound, task.max_output) <= cfg.max_request_estimated_usd
+                && (cfg.max_model_age_days == 0
+                    || m.created == 0
+                    || m.created
+                        >= crate::config::now()
+                            .saturating_sub((cfg.max_model_age_days * 86400) as i64))
                 && (cfg.hard_allowed_models.is_empty()
                     || cfg
                         .hard_allowed_models

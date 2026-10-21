@@ -56,6 +56,10 @@ pub struct Config {
     pub hard_excluded_models: Vec<String>,
     pub pool_tiers: PoolTiers,
     pub pool_per_tier: usize,
+    /// Hard recency rule: models published more than this many days ago are never
+    /// used (selection, backfill, failover, recovery). 0 disables it. Models with no
+    /// catalog publication time are kept.
+    pub max_model_age_days: u64,
     pub max_models: usize,
     pub group_size: usize,
     pub judge_parallelism: usize,
@@ -97,6 +101,7 @@ impl Default for Config {
             hard_excluded_models: vec![],
             pool_tiers: PoolTiers::default(),
             pool_per_tier: 6,
+            max_model_age_days: 0,
             max_models: 1024,
             group_size: 48,
             judge_parallelism: 8,
@@ -166,6 +171,9 @@ impl Config {
             || self.max_output_tokens > 131072
         {
             return Err(Error::bad("Invalid service limits"));
+        }
+        if self.max_model_age_days > 3650 {
+            return Err(Error::bad("max_model_age_days must be at most 3650"));
         }
         if self.session_ttl_secs < 1
             || self.session_ttl_secs > 86400 * 7
