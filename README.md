@@ -1,150 +1,188 @@
-# Jev Router — Rust
+# Jev Router
 
-An independent Rust implementation of Jev-powered model and reasoning-effort routing through OpenRouter. The API, CLI, routing engine, persistence, streaming and tests are Rust. There is no Node.js or Python runtime dependency.
+[![CI](https://github.com/rockbye-kunal/jev-router-rust/actions/workflows/ci.yml/badge.svg)](https://github.com/rockbye-kunal/jev-router-rust/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Rust 2024](https://img.shields.io/badge/rust-2024_edition-orange.svg)
 
-This is not TypeSafe's or OpenRouter's official router source. It implements documented controls with an inspectable independent policy. It does not reproduce undisclosed market-spend rankings, private model quality scores or their precise selection decisions. See [COMPATIBILITY.md](COMPATIBILITY.md), [PRODUCTION-ACCEPTANCE.md](PRODUCTION-ACCEPTANCE.md) and [VERIFICATION.md](VERIFICATION.md).
+A self-hosted, OpenRouter-compatible router that picks the **model and reasoning effort** for every request. Send `"model": "auto"` and the router builds a pool of cheap, medium and hard models, asks [Jev](https://openrouter.ai/docs/guides/routing/routers/jev-router) to choose once, forwards your original request, and checks the answer before returning it.
 
-## Run
+One Rust binary. No Node or Python runtime. Callers bring their own OpenRouter key and pay OpenRouter directly.
 
-Requires a current stable Rust toolchain. This checkout was built using Rust 1.99.1. `Cargo.lock` is included.
+> This is an independent implementation of documented Jev Router behaviour. It is not OpenRouter's or TypeSafe's router source and does not reproduce their private rankings or scores. See [docs/compatibility.md](docs/compatibility.md).
+
+## Why
+
+Calling a fixed model is either expensive (a frontier model for every "hello") or unreliable (a small model for every hard task). Routing helps only if the routing step itself is cheap and predictable. This router:
+
+- **Routes in one decision.** A capped, tiered pool of up to 22 models fits a single Jev comparison. Comparing the whole catalog took about 10 decisions per request.
+- **Always offers a cheap, a medium and a hard option**, and tells Jev which tier each model is in.
+- **Uses only the models you allow**, with a hard recency rule so retired releases never get picked.
+- **Fails safe.** Rate limits fail over, empty answers are recovered once, and uncertain picks are double-checked.
+
+Measured locally on the same short question, before and after tiered pools:
+
+| | Whole catalog | Tiered pool |
+|---|---:|---:|
+| Jev decision calls | 10 | 2 |
+| Routing time | 3.0 s | 1.7 s |
+| Routing cost | $0.00197 | $0.00016 |
+
+## How it works
+
+```mermaid
+flowchart LR
+    A[Request<br/>model: auto] --> B[Verify caller key<br/>reserve quota]
+    B --> C[Hard filters<br/>allowed makers · release age<br/>tools · media · context · budget]
+    C --> D[Tier pool<br/>cheap · medium · hard<br/>+ fallback]
+    D --> E[Jev picks model<br/>then effort]
+    E --> F[Forward original request<br/>stream or JSON]
+    F --> G[Check output<br/>record cost · respond]
+    F -. 429 .-> F2[Fail over to a<br/>similar-priced model]
+    G -. empty or cut off .-> G2[One recovery attempt]
+```
+
+1. **Authenticate.** The caller's OpenRouter key is verified (cached for 30 s). Its quota is reserved atomically in SQLite before any paid call.
+2. **Filter.** Hard rules remove models that are not allowed, were released too long ago, or cannot handle this request's tools, images, JSON schema, context length or budget.
+3. **Build the tier pool.** Each tier is a priority list of patterns. Every pattern resolves to its newest release. A hard pick must cost at least as much as the priciest medium pick. Empty tiers are backfilled by cost percentile. The fallback, repair and recovery models are always included.
+4. **Decide.** Jev chooses the model, with an extra check against the fallback when confidence is low, then the reasoning effort for models that support several levels.
+5. **Generate.** The full original request goes to the chosen model unchanged, in Chat Completions, Responses or Messages format, streamed or not.
+6. **Check and record.** Empty or truncated answers get one bounded recovery. Simple money totals are verified exactly. Cost, model and effort are stored under the request ID.
+
+## Features
+
+- **Three wire protocols:** `/v1/chat/completions`, `/v1/responses` and `/v1/messages`, with SSE streaming, tools and structured output passed through.
+- **Bring your own key:** per-key tenants, quotas and audit records. Keys are never stored or logged.
+- **Tiered routing pool:** cheap, medium and hard tiers resolved from the live catalog, with stale patterns reported.
+- **Hard model policy:** allow and deny lists, a maximum release age, and per-request exclusions.
+- **Resilience:** rate-limit failover, per-key circuit breakers, output recovery, exact money-total checks, and session pinning for tool loops.
+- **Operations:** JSON logs, `/healthz` and `/readyz`, graceful SIGTERM drain, crash recovery of in-flight reservations, and a non-root Docker image behind Caddy TLS.
+
+## Quick start
+
+Requires a current stable Rust toolchain.
 
 ```sh
+git clone https://github.com/rockbye-kunal/jev-router-rust.git
+cd jev-router-rust
 cargo build --release --locked
-cp .env.example .env
-# Edit .env locally with OPENROUTER_API_KEY; never paste it into chat.
+
+cp .env.example .env            # then put OPENROUTER_API_KEY=... in .env
 ./target/release/jev-router --config config.local.json serve
 ```
 
-`config.local.json` is the loopback version of `config.production.json`, with the same tiered routing pool. Running `serve` without `--config` uses built-in defaults, which compare the whole eligible catalog (slower, about ten Jev calls per request).
-
-Local address: `http://127.0.0.1:8788`. The existing TypeScript service, if running, remains on port 8787. To reuse an existing local env file without copying its contents:
+In another terminal:
 
 ```sh
-./target/release/jev-router --env-file ../jev-router/.env serve
-```
-
-Commands:
-
-```sh
-jev-router catalog                       # Refresh public model capabilities
-jev-router check-config                  # Validate defaults
-jev-router --config config.production.json check-config
-jev-router doctor                        # Configuration status; never prints keys
-jev-router --config config.local.json pool   # Which catalog models each tier resolves to; no paid calls
-jev-router smoke                         # Eight live checks with model preferences; billed
-jev-router acceptance                    # Nine live checks with NO model/effort preferences; billed
-```
-
-The smoke command reads `OPENROUTER_API_KEY` from `.env` or the specified `--env-file`, calls the running local router, and saves sanitized results to `LIVE-RESULTS.json`.
-
-`acceptance --base-url https://YOUR_DOMAIN` checks automatic routing without caller model or effort preferences, including all three protocols with and without streaming, tool arguments, strict JSON output and an exactly checked arithmetic case. It spaces cases by five seconds by default (`--delay-ms` changes test pacing), writes `AUTO-ROUTING-RESULTS.json`, and records failed/partial runs rather than leaving a stale passing report. Pacing this acceptance suite does not establish production throughput or remove upstream rate limits.
-
-The toolchain installed for this workspace lives outside this project, under `../../work/rust-toolchain`. It is not part of the production runtime. A prebuilt local executable is under `target/release/jev-router` after the release build.
-
-## Public callers: one OpenRouter key
-
-A public deployment requires every caller to supply **their own OpenRouter inference key**. The same key is used for Jev and generation; callers pay OpenRouter directly. No separate TypeSafe key, router key, registration token or operator-funded public endpoint is required.
-
-```sh
-curl https://YOUR_DOMAIN/v1/chat/completions \
-  -H "Authorization: Bearer $OPENROUTER_API_KEY" \
+curl -s http://127.0.0.1:8788/v1/chat/completions \
   -H 'Content-Type: application/json' \
   -H 'X-OpenRouter-Metadata: enabled' \
-  -d '{
-    "model": "typesafe/jev-router",
-    "plugins": [{"id":"jev-router","cost_tier":"medium"}],
-    "messages": [{"role":"user","content":"Explain a mutex versus a semaphore."}],
-    "max_tokens": 4096,
-    "stream": false
-  }'
+  -d '{"model":"auto","messages":[{"role":"user","content":"Explain a mutex versus a semaphore in two lines."}],"max_tokens":1024}'
 ```
 
-A configured server key can be used without an Authorization header **only** when both the bind address and actual TCP peer are loopback. A public bind such as `0.0.0.0` never falls back to that key. Origin checks prevent cross-origin browser use of automatic localhost credentials. The native Messages `x-api-key` header accepts the same OpenRouter key. Public mode supports browser CORS with explicit caller credentials and no cookies; localhost automatic-key mode does not enable cross-origin access.
+On loopback the server uses the key from `.env`. A public bind always requires each caller's own key. With `X-OpenRouter-Metadata: enabled`, the response includes the candidates, their tiers, the chosen model and effort, Jev cost and timings.
 
-Caller keys are verified through OpenRouter's current-key endpoint, retained only for request execution (except an explicitly configured local server key), and never persisted in the database, responses or logs. Verification is cached for 30 seconds by a SHA-256 fingerprint; outbound calls still enforce upstream revocation. The fingerprint namespaces sessions, limits and audit records. These are **per-key tenants**, not identities of human users: rotating to a different upstream key creates a new tenant namespace. Use OpenRouter account/workspace guardrails for person/account-level budgets.
+Prebuilt binaries for Linux x86_64 and macOS arm64 are attached to each [release](https://github.com/rockbye-kunal/jev-router-rust/releases).
 
-The operator of the deployed server processes caller keys in memory and conversation content in transit. Deploy only under a trusted domain with TLS and appropriate access to the host. The service does not charge customer invoices or manage subscription accounts.
+## Configuration
+
+Two ready-made configs ship with the repo: `config.local.json` (loopback) and `config.production.json` (public bind for Docker). Every field is optional and falls back to a built-in default. Unknown fields are rejected.
+
+| Field | Default (shipped) | What it does |
+|---|---|---|
+| `pool_tiers.cheap / medium / hard` | see config files | Priority-ordered model patterns per tier. Empty on all three tiers means the whole catalog is compared. |
+| `pool_per_tier` | `6` | Maximum models per tier. Extra patterns act as spares. |
+| `hard_allowed_models` | OpenAI, Anthropic, Gemini, xAI, DeepSeek, Qwen | Only these patterns can ever be used. |
+| `hard_excluded_models` | GPT-OSS, Qwen 2.x, older DeepSeek | Never used, even if allowed. |
+| `max_model_age_days` | `365` | Models released longer ago are never used. `0` turns this off. |
+| `fallback_model` | `anthropic/claude-sonnet-5.5` | Conservative pick when Jev is uncertain. |
+| `repair_model` / `output_recovery_model` | `google/gemini-3.8-flash` / `openai/gpt-5.4` | Used for answer repair and empty-output recovery. |
+| `daily_estimated_budget_usd` | `10` | Per-key daily estimated spend. |
+| `max_request_estimated_usd` | `1` | Per-request estimate cap, including routing and repair. |
+| `requests_per_minute` / `tenant_concurrent` | `60` / `4` | Per-key rate and concurrency. |
+| `request_timeout_secs` | `240` | Total deadline for paid work, including streams. |
+| `verify_text_answers` / `model_answer_review` | `true` / `false` | Exact checks on by default; model-based review off by default. |
+
+Patterns are case-sensitive globs (`*`, `?`, `[0-9]`) or exact IDs. Check what they resolve to, without paid calls:
+
+```sh
+./target/release/jev-router --config config.local.json pool
+```
+
+### Command line
+
+| Command | Purpose |
+|---|---|
+| `serve` | Run the HTTP server |
+| `pool` | Show the models each tier resolves to and any stale patterns |
+| `catalog` | Refresh the cached OpenRouter model catalog |
+| `check-config` / `doctor` | Validate configuration and report status (never prints keys) |
+| `health` | Readiness probe used by the Docker healthcheck |
+| `smoke` / `acceptance` | Live end-to-end checks against a running router (billed) |
+
+Use `--config <file>` for a config and `--env-file <file>` for an alternative `.env`.
 
 ## API
 
 | Endpoint | Purpose |
 |---|---|
-| `POST /v1/chat/completions` | Chat Completions, including tool calls and SSE |
-| `POST /v1/responses` | Responses wire format |
-| `POST /v1/messages` | Messages wire format |
-| `POST /v1/route` | Jev selection preview; no generation, but Jev is billed |
-| `GET /v1/models` | Router model identity and registry summary |
-| `GET /v1/usage` | Only the caller key's quota counters |
-| `GET /v1/requests/{id}` | Only the caller key's decision/billing record |
-| `GET /healthz` | Process liveness |
-| `GET /readyz` | Catalog readiness; no paid provider probe |
+| `POST /v1/chat/completions` | Chat Completions, including tools and SSE |
+| `POST /v1/responses` | Responses API format |
+| `POST /v1/messages` | Messages API format |
+| `POST /v1/route` | Preview the routing decision without generating (Jev is billed) |
+| `GET /v1/models` | Router identity and catalog summary |
+| `GET /v1/usage` | The caller key's quota counters |
+| `GET /v1/requests/{id}` | The caller key's routing and billing record |
+| `GET /healthz`, `GET /readyz` | Liveness and catalog readiness |
 
-Accepts `model: "typesafe/jev-router"`, `"jev-router"` or `"auto"`. Original message/content/tool/input objects are forwarded to the selected generator in the same protocol; the router does not execute client tools. Remote media is forwarded, never fetched by the Rust host itself. Images/files/audio/video require matching advertised input capabilities and must fit conservative context/cost admission bounds. Large base64 content can be rejected because input admission deliberately overestimates tokens rather than silently truncating the generator conversation.
+The model can be `auto`, `jev-router` or `typesafe/jev-router`. Optional routing controls go in a plugin entry:
 
-Only routing fields are interpreted locally. Unsupported protocol fields can still be rejected by OpenRouter. Wire forwarding is not a claim that every model supports every upstream parameter. Provider parameter checks are enabled.
+```json
+"plugins": [{"id": "jev-router", "cost_tier": "medium", "allowed_models": ["anthropic/*"], "excluded_models": ["openai/*"]}]
+```
 
-Plugin parameters: `id`, `cost_tier` (`low`, `medium`, `high`), `models`, `allowed_models`, `excluded_models`. Unknown plugin fields return 400. Include lists are soft preferences, combined before model comparison; they are ignored only when no eligible included model remains. Exclusions and operator `hard_allowed_models`/`hard_excluded_models` are always enforced. A definite endpoint 404 triggers at most one pool rebuild/retry; network timeouts, 5xx responses and interrupted streams are not retried as generation may already be billed. A generation HTTP 429 is a definite pre-output rejection: OpenRouter provider fallback is enabled by default (`allow_provider_fallbacks`; a caller may send `provider.allow_fallbacks: false`), and the router then fails over at most `max_generation_failovers` times (default 2). It prefers the configured recovery, repair and fallback models, otherwise the eligible model nearest in estimated cost at or above the rejected one, and keeps the selected reasoning effort (or the nearest supported level). The rejected model cools down for that caller key only, for the provider `Retry-After` or the circuit cooldown, capped at 15 minutes. Account/key-level limits (`limit_source: openrouter_*`) and bound tool or session turns never fail over. Rejections are recorded in the request audit, and a final 429 returns `Retry-After` and `rate_limit_scope`. The retry still respects all hard constraints. Cost tiers are selection preferences, not effort levels or guaranteed spending ceilings. Completed non-stream responses with empty visible output or token-limit truncation receive at most one recovery on an eligible configured fallback/repair model. The dedicated `output_recovery_model` (default `openai/gpt-5.4`) is preferred, then the configured fallback and repair models if eligible; the same model may be used again only at a strictly lower effort. Recovery disables hidden reasoning when the model explicitly supports `none`; otherwise it uses low effort for output limits up to 4,096 tokens, otherwise medium when supported, and never raises the caller token limit. It preserves the active candidate pool, provider restrictions and budget; bound sessions and tool-result turns cannot switch models. Refusals are returned unchanged. Both generations are reserved and accounted for, even when answer review is disabled; recovery and answer repair share a two-generation limit. If recovery cannot complete, the API returns a specific error rather than presenting truncated text as a completed answer. Streams already forwarded to callers cannot be regenerated.
-
-Top-level `reasoning.effort` or legacy `reasoning_effort` is a hint. Selection uses the model's known effort list; null and omitted effort metadata are distinguished. Budget-control models use an output-relative reasoning budget. Models without controllable effort report `default` or `none` rather than inventing support. `reasoning.max_tokens` and pro mode are rejected at the router interface.
-
-## Routing policy
-
-1. Verify the caller key and load a fresh model registry.
-2. Enforce input/output/context requirements, tools/JSON capability, operator restrictions, caller exclusions and request cost admission.
-3. Apply soft include preferences. If none remain eligible, rebuild without includes.
-4. Reserve quota atomically in SQLite before any paid call.
-5. With `pool_tiers` configured (as in both shipped configs), build a capped pool like the hosted router's ranked pool cap: up to `pool_per_tier` (default 6) eligible models from each of the `cheap`, `medium` and `hard` lists. Each pattern contributes one model, its newest match by catalog `created` time, skipping `:free`-style variants; patterns beyond the per-tier limit act as spares when earlier ones match nothing. A hard pick must cost at least as much as the most expensive medium pick, so a cheap fast variant cannot fill the hard tier. A tier left empty for a request (stale IDs, image input, tools, sampling parameters) is backfilled with up to two unlisted eligible models at the 10th, 50th or 85th cost percentile, never deep-research, search, image or `-pro` variants. The fallback, repair, recovery and any session-bound model are always kept. The shipped configs allow only closed models (OpenAI, Anthropic, Gemini, xAI) plus recent DeepSeek and Qwen through `hard_allowed_models`, and `max_model_age_days: 365` blocks any model published more than a year ago; tier patterns are wildcards so each resolves to its newest release; `hard_excluded_models` blocks GPT-OSS and older Qwen 2.x/QwQ and DeepSeek R1/V3/chat. These hard restrictions also apply to backfill, failover, recovery and caller preferences. Every request therefore sees cheap, medium and hard options, and Jev is told each candidate's tier with guidance to pick the least expensive tier that will reliably succeed. The pool fits one group, so model choice is one Jev call (plus an adequacy review when uncertain and an effort call for multi-effort models); an endpoint-404 rebuild uses the same cap. Caller `models`/`allowed_models` lists keep their own pool instead. Rate-limit failover and output recovery still use the full eligible pool. `jev-router pool` shows the resolved tiers; stale patterns are listed there and logged as `tier_pattern_matches_no_catalog_model` at startup and catalog refresh.
-   Without tiers, ask Jev to compare models in bounded groups (default 48). Group winners are compared again; scores from unrelated groups are not treated as globally calibrated probabilities. The winner's decision path influences uncertainty checks.
-6. Ask Jev for a supported effort on the chosen model. Model/effort are independent bounded decisions, with task context and cost preference shared between them. This differs from the earlier TypeScript prototype's fixed joint-pair list.
-7. Low model confidence triggers a focused adequacy review against the eligible configured fallback. A close many-model comparison does not automatically escalate to a premium model. If the focused review is inconclusive, low-tier requests return an explicit error; other tiers use the eligible conservative fallback. A single eligible model does not require a confidence-based substitution. Uncertain effort gets a runoff between the top two choices, then the stronger of those two if still unresolved. Jev failure never becomes a silent cheapest-model decision.
-8. In an existing tool loop or stateful Responses continuation, preserve the tenant's model binding. A now-ineligible binding returns 409. Other session turns may retain or switch based on Jev assessment.
-9. Forward generation, preserve tool identifiers/stream ordering and record usage. No hidden tool execution or recursive router invocation.
-10. By default, bounded, completed plain-text answers receive a separate check before being returned. Unambiguous single-message quantity × unit-price total requests use exact integer arithmetic in cents; unsupported adjustments, ambiguous inputs, overflow and unsupported formats do not receive that exact-validation claim. Other tasks are marked `no_deterministic_validator`. Fallible structured model review is optional via `model_answer_review: true` and is off by default because live tests exposed both missed errors and false rejections. A rejected answer can be regenerated once using the eligible `repair_model` (default Gemini 3 Flash), or the eligible fallback. The replacement is checked again; failure returns an error. Both generations and reviews are accounted for. Repair does not widen generation preferences or relax hard exclusions, privacy or session bindings. When optional review is enabled, review-model access is restricted by hard policy and budget; soft generation preferences do not restrict the separate reviewer. Configure `verify_text_answers: false` only if you intentionally want to omit these checks.
-
-Model review is not proof of factual correctness. Live tests showed both Jev and a generation-model reviewer accepting incorrect arithmetic; exact supported money-total checks therefore override model judgments. The exact check uses the full single-message request. Other reviews see the bounded routing summary and at most 8,000 bytes of answer text. Streaming, structured output, tool/mixed-content output, partial output, multiple choices and longer answers are not semantically reviewed; metadata/audit records report the review status. Use domain-specific validators, tool execution results and representative evaluations where correctness matters. Review and repair increase latency and costs; they do not guarantee savings compared with one fixed model.
-
-Use `session_id` or `X-Session-Id` to enable tenant-scoped continuity. Conflicting values are rejected. `previous_response_id` requires an existing session binding. Session records store model/effort and identifiers, not conversation bodies; expired bindings are not reused.
-
-Tool-result turns also require an existing binding, including Responses `function_call_output`. Send the session identifier on the initial request before executing tools. The router rejects unbound or expired continuations rather than selecting an unrelated model. Local session and routing controls are removed from the forwarded generator body. Media capabilities are checked across the complete forwarded conversation, while only bounded recent text reaches Jev. Requested supported-parameter requirements and strict-schema capability are checked before selection.
-
-An optional operator `advisor_model` enables at most one bounded expert consultation on high-tier requests where Jev judges it useful. That model must remain eligible under the caller/operator restrictions. Advice is inserted as untrusted advisory context, not tool authorization. Default is off. If an advisor is requested but unavailable/disabled, metadata reports `max_fallback: "deep"`.
-
-## Observability and estimates
-
-The server writes JSON logs to stderr (stdout carries only command output and the `listening` event). Each HTTP request produces one `request` line with method, path (no query), status, `request_id`, selected model/effort and `header_ms` (time to response headers; for streams, completion is in the request record). Internal errors log their cause for operators while callers still receive a generic `internal_error`; 5xx responses also log their error code. Keys, prompts, answers and headers are never logged. Set the level with `RUST_LOG` (default `warn,jev_router=info`).
-
-Set `X-OpenRouter-Metadata: enabled` for routing metadata on JSON responses. All successful responses include `x-request-id`, `x-jev-model`, `x-jev-effort` and `x-jev-reason`. Streaming bytes are forwarded without protocol conversion or injected events; fetch `/v1/requests/{id}` for the decision record and settlement status. SSE frames are inspected incrementally, with a 1 MiB frame buffer cap, to collect reported usage and detect model changes/errors.
-
-The ledger distinguishes exact reported provider costs from conservative estimates. Input estimates use serialized request bytes plus overhead; reserve calculations include Jev and optional advice. Provider token-price ceilings are attached to generation requests. Multimodal fees, provider billing behavior and ambiguous failures mean local estimates are not contractual account spending caps. Configure upstream key/account guardrails for hard billing controls.
-
-An interrupted request, missing usage cost or stream with no completion/cost marker retains a conservative reservation charge for admission accounting. This prevents an attacker from getting free quota by disconnecting. It is not a claim that OpenRouter billed that amount. Restart recovery converts abandoned reservations once and frees active slots. Audit records and old quotas are pruned after 30 days; old sessions after seven days.
+`cost_tier` (`low`, `medium`, `high`) is a preference, not a price cap. Include lists are soft and exclusions are hard. Send `session_id` (or `X-Session-Id`) to keep tool loops and follow-up turns on the same model. Every response carries `x-request-id`, `x-jev-model`, `x-jev-effort` and `x-jev-reason` headers.
 
 ## Deployment
 
-Use [DEPLOYMENT.md](DEPLOYMENT.md). A non-root Docker image and TLS reverse-proxy Compose deployment are provided. Public mode works without an operator OpenRouter key. The public key limit, body cap, global semaphore, tenant rate/concurrency limits and durable reservations protect one deployment; edge-level abuse protection should be configured for the intended audience.
-
-**SQLite is deliberately a single-node deployment.** A file lock prevents two router processes from owning the same database. Do not scale Compose replicas against this volume. Horizontal deployment needs a shared transactional store and distributed admission state; that is not implemented. The server closes gracefully on SIGTERM; the provided container grants 300 seconds for the 240-second request/stream deadline.
-
-## Verification
+A single-node Docker deployment behind Caddy TLS is included:
 
 ```sh
-cargo fmt --check
-cargo clippy --locked --all-targets -- -D warnings
-cargo test --locked
-cargo build --release --locked
-JEV_ROUTER_E2E_BIN="$PWD/target/release/jev-router" cargo test --locked --test process_e2e
-cargo audit
+export DOMAIN=router.example.com
+docker compose up --build -d
 ```
 
-Or run the same sequence with one script; `--live` adds one real billed example (an unrestricted arithmetic request through a fresh server on port 18788 with a temporary database, then the audit record, usage counters and a clean SIGTERM stop):
+The container runs as a non-root user on a read-only filesystem, logs JSON with rotation, and drains in-flight requests on stop. SQLite keeps it to one node per database. See [docs/deployment.md](docs/deployment.md) for the checklist, limits and operations.
+
+## Testing
 
 ```sh
-scripts/local-integration.sh          # offline only, no paid calls
-scripts/local-integration.sh --live   # plus one billed OpenRouter example (needs OPENROUTER_API_KEY in .env)
+scripts/local-integration.sh          # fmt, clippy, all tests, release build, process e2e (no paid calls)
+scripts/local-integration.sh --live   # plus one real billed request through a fresh server
 ```
 
-Tests use real local HTTP provider fixtures; they make no paid calls. The live smoke command uses the actual configured key and charges OpenRouter. See [VERIFICATION.md](VERIFICATION.md) for what was actually run. Integration success is not evidence that the independent policy matches the official router's quality or cost; evaluate representative tasks and calibrate thresholds before a client rollout.
+The test suite runs real HTTP against local provider fixtures: routing, tiers, protocols, streaming, failover, recovery, quotas, tenant isolation, crash recovery and shutdown. CI runs the same checks plus `cargo audit` and a container smoke test. Recorded live results are in [docs/verification](docs/verification/VERIFICATION.md).
 
-The executable integration test launches a real public-mode server process with fixture upstreams. It exercises task-dependent model/effort choices, all three native streaming protocols, BYOK, CORS, tenant records, exclusive database ownership, forced termination, restart recovery and SIGTERM shutdown. It also verifies that failed smoke tests overwrite old passing reports. CI includes release-process tests and a container smoke job; CI/container execution still needs verification on the deployment host when unavailable locally.
+## Limitations
 
-Primary references: [Jev Router controls](https://openrouter.ai/docs/guides/routing/routers/jev-router), [Decisions API](https://openrouter.ai/docs/api/api-reference/alphadecisions/submit-a-decisions-request), [model capabilities](https://openrouter.ai/docs/guides/overview/models), [reasoning](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens), [current key](https://openrouter.ai/docs/api/api-reference/api-keys/get-current-key).
+- Single node only (SQLite with an exclusive lock). Horizontal scaling needs a shared store.
+- Local budgets are conservative estimates, not invoices. Set hard spending limits on your OpenRouter keys too.
+- Routing quality depends on Jev and on your tier lists. Evaluate representative tasks against a fixed-model baseline before a wide rollout.
+- Answer checks are exact only for simple money totals. Other answers are not verified for correctness.
+- For very short, cheap questions the routing step can cost more than the answer.
+
+## Project layout
+
+```
+src/        server, routing engine, tier pool policy, catalog, store, streaming, validation
+tests/      HTTP system tests and a release-binary process test
+docs/       deployment, compatibility and verification records
+scripts/    local integration check
+```
+
+## Contributing
+
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). Report security problems privately as described in [SECURITY.md](SECURITY.md). Changes are listed in [CHANGELOG.md](CHANGELOG.md).
+
+## License
+
+[MIT](LICENSE)

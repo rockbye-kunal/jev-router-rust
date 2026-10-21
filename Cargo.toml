@@ -1,9 +1,13 @@
 [package]
 name = "jev-router"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
-description = "A Rust Jev-powered, OpenRouter-compatible model and effort router"
+description = "Self-hosted, OpenRouter-compatible router that picks the model and reasoning effort for each request using Jev"
+repository = "https://github.com/rockbye-kunal/jev-router-rust"
+readme = "README.md"
+keywords = ["openrouter", "llm", "router", "ai-gateway", "jev"]
+categories = ["web-programming::http-server", "command-line-utilities"]
 
 [dependencies]
 axum = { version = "0.8", features = ["macros"] }

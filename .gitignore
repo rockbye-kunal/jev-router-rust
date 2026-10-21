@@ -7,3 +7,6 @@
 *.lock.tmp
 /LIVE-SMOKE-LOG.txt
 /AUTO-ROUTING-LOG.txt
+# Written by `jev-router smoke` / `acceptance`; curated results live in docs/verification/
+/LIVE-RESULTS.json
+/AUTO-ROUTING-RESULTS.json

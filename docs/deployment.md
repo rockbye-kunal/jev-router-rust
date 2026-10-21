@@ -4,7 +4,7 @@ This deployment is for a BYOK API: each caller sends an OpenRouter inference key
 
 ## Before rollout
 
-1. Run the documented Rust tests, formatting/lint checks and dependency audit. Build and test the Docker image on the target OS; local verification status is in VERIFICATION.md.
+1. Run the documented Rust tests, formatting/lint checks and dependency audit. Build and test the Docker image on the target OS; local verification status is in [verification/VERIFICATION.md](verification/VERIFICATION.md).
 2. Review `config.production.json`: output/body limits, per-key quotas, estimated budgets, Jev confidence settings, model restrictions, fallback, data policy and provider availability.
    Review `repair_model`, `verify_text_answers` and `model_answer_review` too. Exact supported checks are enabled by default; fallible model review is off by default. If enabled, plain-text review can call the designated reviewer outside soft generation preferences, but never outside hard restrictions or admission limits. Ensure a structured-output-capable reviewer remains available under your hard policy. Unsupported/ambiguous arithmetic, structured output, tools, long output and streams do not receive a general correctness guarantee.
 3. Evaluate general-task quality and cost against a fixed-model baseline and, if desired, the hosted official router. These smoke tests are not quality benchmarks.

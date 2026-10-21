@@ -1,5 +1,7 @@
 # Verification record
 
+> Historical records from the v0.1.0 acceptance run on 18 Oct 2026, kept as evidence. From v0.2.0 on, every push is verified by CI (format, clippy, tests, release build, process e2e, cargo audit, container smoke); live routing results for tiered pools are in the [changelog](../../CHANGELOG.md).
+
 Latest automatic-routing and executable acceptance results: [PRODUCTION-ACCEPTANCE.md](PRODUCTION-ACCEPTANCE.md). The earlier six-case smoke results below are historical; the latest unrestricted nine-case suite is AUTO-ROUTING-RESULTS.json.
 
 Verified locally on 2026-10-18 on Apple Silicon macOS, using Rust 1.99.1. This is an independent implementation, not a certification or reproduction of OpenRouter's private selection policy.

@@ -58,6 +58,6 @@ The implementation is single-node SQLite with one owning process. Docker/Compose
 
 No held-out general-task routing benchmark, exhaustive provider/SDK test matrix, real-provider stress test or live media suite was completed. Exact arithmetic checks cover a deliberately narrow unambiguous quantity × unit-price grammar; unsupported tasks are not claimed as verified. Optional model review is off by default because live tests exposed both missed errors and false rejections. Routing confidence is not answer accuracy. Review, routing and repair add cost; this wide tournament policy is not claimed to minimize cost or match OpenRouter's private rankings.
 
-Use [DEPLOYMENT.md](DEPLOYMENT.md) for deployment-host acceptance. A public domain has not been deployed by this work. The updated local development service is available only on loopback at port 8788.
+Use [deployment guide](../deployment.md) for deployment-host acceptance. A public domain has not been deployed by this work. The updated local development service is available only on loopback at port 8788.
 
 Published contract reference: [OpenRouter Jev Router documentation](https://openrouter.ai/docs/guides/routing/routers/jev-router). The implementation pins Jev 1.13 and uses independently implemented policy; newer catalog releases do not silently change that pin.
