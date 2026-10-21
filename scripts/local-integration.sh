@@ -46,9 +46,13 @@ live() {
   }
   trap cleanup EXIT
 
-  cat >"$work/config.json" <<JSON
-{"bind":"127.0.0.1:${port}","database":"${work}/router.db","catalog":"${work}/catalog.json"}
-JSON
+  # Same routing policy as local use (config.local.json, including tiered pools), but an
+  # isolated port, database and catalog so a running router is never touched.
+  sed -e "s#\"bind\": \"[^\"]*\"#\"bind\": \"127.0.0.1:${port}\"#" \
+      -e "s#\"database\": \"[^\"]*\"#\"database\": \"${work}/router.db\"#" \
+      -e "s#\"catalog\": \"[^\"]*\"#\"catalog\": \"${work}/catalog.json\"#" \
+      config.local.json >"$work/config.json"
+  grep -q "${work}/router.db" "$work/config.json" || fail "could not derive test config from config.local.json"
 
   if curl -fsS "${base}/healthz" >/dev/null 2>&1; then fail "port ${port} already in use; stop that process or set JEV_IT_PORT"; fi
   step "Starting router on ${base} (logs: ${work}/server.log)"
@@ -63,6 +67,8 @@ JSON
   done
   $ready || { cat "$work/server.log" >&2; fail "server not ready after 60 s"; }
   echo "ready: $(cat "$work/ready.json")"
+  step "Tier pool resolved from the live catalog"
+  "$bin" --config "$work/config.json" pool || fail "pool preview failed"
 
   step "Example: unrestricted arithmetic request (billed to your OpenRouter key)"
   local status
@@ -78,6 +84,9 @@ JSON
   echo "HTTP ${status}  request=${request_id}  model=${model}  effort=${effort}  reason=${reason}"
   [ "$status" = 200 ] || { cat "$work/answer.json" >&2; fail "expected HTTP 200"; }
   [ -n "$request_id" ] && [ -n "$model" ] || fail "routing headers missing"
+  local decisions
+  decisions="$(grep -o 'typesafe/jev-[0-9.]*-[0-9]*' "$work/answer.json" | wc -l | tr -d ' ' || true)"
+  echo "Jev decision calls: ${decisions} (tiered pool target: 1-3)"
   local content
   content="$(grep -o '"content":"[^"]*"' "$work/answer.json" | head -1 || true)"
   printf '%s' "$content" | grep -q '270' || { cat "$work/answer.json" >&2; fail "answer does not contain the total 270"; }

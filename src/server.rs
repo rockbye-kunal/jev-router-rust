@@ -415,7 +415,7 @@ async fn handle(
 async fn execute(
     s: AppState,
     key: Credential,
-    task: Task,
+    mut task: Task,
     permit: OwnedSemaphorePermit,
     metadata_enabled: bool,
     preview: bool,
@@ -479,9 +479,27 @@ async fn execute(
     let mut reservation = s.store.reserve(&key.tenant(), estimate, &s.cfg).await?;
     let request_id = reservation.id.clone();
     let started = std::time::Instant::now();
+    // Like the hosted router's capped pool: compare a ranked tier mix in one Jev call
+    // instead of the whole catalog. Caller include lists keep their own pool; the full
+    // `pool` stays available for rate-limit failover and output recovery.
+    let routing_pool = if s.cfg.pool_tiers.enabled()
+        && (ignored || (task.plugin.models.is_empty() && task.plugin.allowed_models.is_empty()))
+    {
+        let (capped, tiers) = policy::tiered_pool(
+            &task,
+            &pool,
+            &registry,
+            &s.cfg,
+            previous.as_ref().map(|p| p.0.as_str()),
+        );
+        task.tiers = tiers;
+        capped
+    } else {
+        pool.clone()
+    };
     let (mut selection, mut model, wants_advisor) = s
         .engine
-        .select(&key, &task, &pool, ignored, previous.as_ref())
+        .select(&key, &task, &routing_pool, ignored, previous.as_ref())
         .await?;
     let mut trace = metadata(&selection, &task, registry.fetched_at, &request_id);
     if preview {

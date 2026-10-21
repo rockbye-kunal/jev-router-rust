@@ -48,6 +48,8 @@ pub struct Task {
     pub session: Option<String>,
     pub tool_turn: bool,
     pub effort_hint: Option<String>,
+    /// Operator tier per pooled model ID; filled after eligibility when tiers are enabled.
+    pub tiers: std::collections::BTreeMap<String, String>,
 }
 fn scan_modalities(v: &Value, modalities: &mut Vec<String>) {
     match v {
@@ -330,6 +332,7 @@ pub fn parse(body: Value, protocol: Protocol, cfg: &Config) -> Result<Task> {
         session,
         tool_turn,
         effort_hint,
+        tiers: Default::default(),
     })
 }
 fn pattern(p: &str) -> Result<globset::GlobMatcher> {
@@ -437,6 +440,97 @@ pub fn eligible(task: &Task, registry: &Registry, cfg: &Config) -> Result<(Vec<M
         ));
     }
     Ok((pool, ignored))
+}
+/// Build the capped routing pool from operator tiers so one Jev comparison covers a
+/// cheap, a medium and a hard option. Order: cheap, medium, hard, then reserved models.
+///
+/// Each tier takes up to `pool_per_tier` models, one per pattern (its newest matching
+/// ID). Variant IDs such as `:free` are skipped unless the pattern names a variant.
+/// A tier with no eligible listed model (for example under media or tool requirements)
+/// is backfilled with up to two unlisted eligible models by estimated cost: cheapest,
+/// middle or most expensive. The configured fallback, repair and recovery models and a
+/// session-bound model are always kept so recovery and session rules keep working.
+pub fn tiered_pool(
+    task: &Task,
+    eligible: &[Model],
+    registry: &Registry,
+    cfg: &Config,
+    bound: Option<&str>,
+) -> (Vec<Model>, std::collections::BTreeMap<String, String>) {
+    let mut chosen: Vec<Model> = Vec::new();
+    let mut tiers = std::collections::BTreeMap::<String, String>::new();
+    for (tier, patterns) in cfg.pool_tiers.lists() {
+        let mut taken = 0;
+        for p in patterns {
+            if taken == cfg.pool_per_tier {
+                break;
+            }
+            let newest = eligible
+                .iter()
+                .filter(|m| {
+                    !tiers.contains_key(&m.id)
+                        && (p.contains(':') || !m.id.contains(':'))
+                        && matches(p, m, registry)
+                })
+                .max_by(|a, b| a.id.cmp(&b.id));
+            if let Some(m) = newest {
+                tiers.insert(m.id.clone(), tier.to_owned());
+                chosen.push(m.clone());
+                taken += 1;
+            }
+        }
+    }
+    let cost = |m: &Model| m.estimate(task.input_bound, task.max_output);
+    let mut rest = eligible
+        .iter()
+        .filter(|m| !tiers.contains_key(&m.id) && !m.id.contains(':'))
+        .collect::<Vec<_>>();
+    rest.sort_by(|a, b| cost(a).total_cmp(&cost(b)).then_with(|| a.id.cmp(&b.id)));
+    for (tier, _) in cfg.pool_tiers.lists() {
+        if tiers.values().any(|t| t.as_str() == tier) {
+            continue;
+        }
+        for _ in 0..cfg.pool_per_tier.min(2) {
+            let picked = match tier {
+                _ if rest.is_empty() => None,
+                "cheap" => Some(rest.remove(0)),
+                "hard" => rest.pop(),
+                _ => {
+                    let middle = rest.len() / 2;
+                    Some(rest.remove(middle))
+                }
+            };
+            let Some(m) = picked else { break };
+            tiers.insert(m.id.clone(), tier.to_owned());
+            chosen.push(m.clone());
+        }
+    }
+    for id in [
+        Some(cfg.fallback_model.as_str()),
+        Some(cfg.repair_model.as_str()),
+        Some(cfg.output_recovery_model.as_str()),
+        bound,
+    ]
+    .into_iter()
+    .flatten()
+    {
+        if tiers.contains_key(id) {
+            continue;
+        }
+        if let Some(m) = eligible.iter().find(|m| m.id == id) {
+            let label = if Some(id) == bound {
+                "session"
+            } else {
+                "fallback"
+            };
+            tiers.insert(m.id.clone(), label.to_owned());
+            chosen.push(m.clone());
+        }
+    }
+    if chosen.is_empty() {
+        return (eligible.to_vec(), std::collections::BTreeMap::new());
+    }
+    (chosen, tiers)
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Selection {

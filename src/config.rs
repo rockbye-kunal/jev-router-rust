@@ -4,6 +4,28 @@ use std::{
     net::{IpAddr, SocketAddr},
     path::PathBuf,
 };
+/// Operator capability bands for the routing pool. Each list is in priority order;
+/// each pattern contributes at most one model (its newest matching ID). Empty lists
+/// on all three tiers disable tiered pools (the whole eligible catalog is compared).
+#[derive(Clone, Default, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct PoolTiers {
+    pub cheap: Vec<String>,
+    pub medium: Vec<String>,
+    pub hard: Vec<String>,
+}
+impl PoolTiers {
+    pub fn enabled(&self) -> bool {
+        !(self.cheap.is_empty() && self.medium.is_empty() && self.hard.is_empty())
+    }
+    pub fn lists(&self) -> [(&'static str, &[String]); 3] {
+        [
+            ("cheap", self.cheap.as_slice()),
+            ("medium", self.medium.as_slice()),
+            ("hard", self.hard.as_slice()),
+        ]
+    }
+}
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Config {
@@ -32,6 +54,8 @@ pub struct Config {
     pub model_answer_review: bool,
     pub hard_allowed_models: Vec<String>,
     pub hard_excluded_models: Vec<String>,
+    pub pool_tiers: PoolTiers,
+    pub pool_per_tier: usize,
     pub max_models: usize,
     pub group_size: usize,
     pub judge_parallelism: usize,
@@ -71,6 +95,8 @@ impl Default for Config {
             model_answer_review: false,
             hard_allowed_models: vec![],
             hard_excluded_models: vec![],
+            pool_tiers: PoolTiers::default(),
+            pool_per_tier: 6,
             max_models: 1024,
             group_size: 48,
             judge_parallelism: 8,
@@ -148,10 +174,22 @@ impl Config {
         {
             return Err(Error::bad("Invalid session/advisor limits"));
         }
+        // Three tiers plus fallback, repair, recovery and a session-bound model must
+        // fit one comparison group, so tiered routing needs a single Jev model decision.
+        if self.pool_tiers.enabled()
+            && (self.pool_per_tier == 0 || 3 * self.pool_per_tier + 4 > self.group_size)
+        {
+            return Err(Error::bad(
+                "pool_per_tier must be at least 1 and 3 * pool_per_tier + 4 must not exceed group_size",
+            ));
+        }
         for p in self
             .hard_allowed_models
             .iter()
             .chain(self.hard_excluded_models.iter())
+            .chain(self.pool_tiers.cheap.iter())
+            .chain(self.pool_tiers.medium.iter())
+            .chain(self.pool_tiers.hard.iter())
         {
             globset::Glob::new(p).map_err(|_| Error::bad("Invalid operator model pattern"))?;
         }

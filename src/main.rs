@@ -32,6 +32,8 @@ enum Command {
     Catalog,
     CheckConfig,
     Doctor,
+    /// Show which catalog models each configured tier resolves to (no paid calls)
+    Pool,
     Smoke {
         #[arg(long, default_value = "http://127.0.0.1:8788")]
         base_url: String,
@@ -104,6 +106,18 @@ async fn run() -> Result<()> {
                 json!({"openrouter_key_configured":key.is_some(),"bind":cfg.bind.to_string(),"catalog_present":cfg.catalog.exists(),"catalog_fresh":Registry::load(&cfg.catalog).is_ok_and(|r|r.fresh(cfg.catalog_max_age_secs)),"jev_model":cfg.jev_model})
             );
         }
+        Command::Pool => {
+            let registry = match Registry::load(&cfg.catalog) {
+                Ok(r) if r.fresh(cfg.catalog_max_age_secs) => r,
+                _ => {
+                    let u = Upstream::new(&cfg)?;
+                    let r = Registry::parse(&u.get("/api/v1/models", None).await?)?;
+                    r.save(&cfg.catalog).await?;
+                    r
+                }
+            };
+            println!("{}", pool_report(&cfg, &registry)?);
+        }
         Command::Catalog => {
             let u = Upstream::new(&cfg)?;
             let r = Registry::parse(&u.get("/api/v1/models", None).await?)?;
@@ -124,6 +138,43 @@ async fn run() -> Result<()> {
         }
     }
     Ok(())
+}
+/// A plain text request shows the default pool; media, tool or schema requirements
+/// can narrow it per request, and tiers without eligible listed models are backfilled.
+fn pool_report(cfg: &Config, registry: &Registry) -> Result<Value> {
+    if !cfg.pool_tiers.enabled() {
+        return Ok(
+            json!({"tiered_pool":false,"note":"pool_tiers is empty: every eligible catalog model is compared"}),
+        );
+    }
+    let task = jev_router::policy::parse(
+        json!({"model":"auto","messages":[{"role":"user","content":"pool preview"}]}),
+        jev_router::policy::Protocol::Chat,
+        cfg,
+    )?;
+    let (eligible, _) = jev_router::policy::eligible(&task, registry, cfg)?;
+    let (pool, tiers) = jev_router::policy::tiered_pool(&task, &eligible, registry, cfg, None);
+    let unmatched = cfg
+        .pool_tiers
+        .lists()
+        .iter()
+        .flat_map(|(tier, patterns)| patterns.iter().map(move |p| (*tier, p)))
+        .filter(|(_, p)| {
+            !registry
+                .models
+                .iter()
+                .any(|m| jev_router::policy::matches(p, m, registry))
+        })
+        .map(|(tier, p)| json!({"tier":tier,"pattern":p}))
+        .collect::<Vec<_>>();
+    Ok(json!({
+        "tiered_pool": true,
+        "catalog_models": registry.models.len(),
+        "eligible_for_plain_text": eligible.len(),
+        "pool_size": pool.len(),
+        "pool": pool.iter().map(|m| json!({"tier":tiers.get(&m.id),"model":m.id,"estimated_cost":m.estimate(task.input_bound,task.max_output),"efforts":m.efforts})).collect::<Vec<_>>(),
+        "patterns_matching_no_catalog_model": unmatched,
+    }))
 }
 async fn serve(cfg: Config, key: Option<Credential>) -> Result<()> {
     if let Some(parent) = cfg.database.parent() {

@@ -12,8 +12,10 @@ Requires a current stable Rust toolchain. This checkout was built using Rust 1.9
 cargo build --release --locked
 cp .env.example .env
 # Edit .env locally with OPENROUTER_API_KEY; never paste it into chat.
-./target/release/jev-router serve
+./target/release/jev-router --config config.local.json serve
 ```
+
+`config.local.json` is the loopback version of `config.production.json`, with the same tiered routing pool. Running `serve` without `--config` uses built-in defaults, which compare the whole eligible catalog (slower, about ten Jev calls per request).
 
 Local address: `http://127.0.0.1:8788`. The existing TypeScript service, if running, remains on port 8787. To reuse an existing local env file without copying its contents:
 
@@ -28,6 +30,7 @@ jev-router catalog                       # Refresh public model capabilities
 jev-router check-config                  # Validate defaults
 jev-router --config config.production.json check-config
 jev-router doctor                        # Configuration status; never prints keys
+jev-router --config config.local.json pool   # Which catalog models each tier resolves to; no paid calls
 jev-router smoke                         # Eight live checks with model preferences; billed
 jev-router acceptance                    # Nine live checks with NO model/effort preferences; billed
 ```
@@ -90,7 +93,8 @@ Top-level `reasoning.effort` or legacy `reasoning_effort` is a hint. Selection u
 2. Enforce input/output/context requirements, tools/JSON capability, operator restrictions, caller exclusions and request cost admission.
 3. Apply soft include preferences. If none remain eligible, rebuild without includes.
 4. Reserve quota atomically in SQLite before any paid call.
-5. Ask Jev to compare models in bounded groups (default 48). Group winners are compared again; scores from unrelated groups are not treated as globally calibrated probabilities. The winner's decision path influences uncertainty checks.
+5. With `pool_tiers` configured (as in both shipped configs), build a capped pool like the hosted router's ranked pool cap: up to `pool_per_tier` (default 6) eligible models from each of the `cheap`, `medium` and `hard` lists, one per pattern (its newest matching ID, skipping `:free`-style variants), plus the fallback, repair, recovery and any session-bound model. A tier with no eligible listed model for this request (for example image input) is backfilled with up to two unlisted eligible models by estimated cost. Every request therefore sees a cheap, medium and hard option, and Jev is told each candidate's tier with guidance to pick the least expensive tier that will reliably succeed. The pool always fits one group, so model choice is one Jev call (plus an adequacy review when uncertain and an effort call for multi-effort models). Caller `models`/`allowed_models` lists keep their own pool instead. Rate-limit failover and output recovery still use the full eligible pool. Check the resolved lists with `jev-router pool` after catalog changes; `patterns_matching_no_catalog_model` shows stale IDs.
+   Without tiers, ask Jev to compare models in bounded groups (default 48). Group winners are compared again; scores from unrelated groups are not treated as globally calibrated probabilities. The winner's decision path influences uncertainty checks.
 6. Ask Jev for a supported effort on the chosen model. Model/effort are independent bounded decisions, with task context and cost preference shared between them. This differs from the earlier TypeScript prototype's fixed joint-pair list.
 7. Low model confidence triggers a focused adequacy review against the eligible configured fallback. A close many-model comparison does not automatically escalate to a premium model. If the focused review is inconclusive, low-tier requests return an explicit error; other tiers use the eligible conservative fallback. A single eligible model does not require a confidence-based substitution. Uncertain effort gets a runoff between the top two choices, then the stronger of those two if still unresolved. Jev failure never becomes a silent cheapest-model decision.
 8. In an existing tool loop or stateful Responses continuation, preserve the tenant's model binding. A now-ineligible binding returns 409. Other session turns may retain or switch based on Jev assessment.
