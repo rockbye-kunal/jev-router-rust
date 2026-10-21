@@ -45,8 +45,8 @@
       "openai/gpt-5.4",
       "google/gemini-*-pro-preview",
       "anthropic/claude-opus-*",
-      "x-ai/grok-4",
-      "qwen/qwen3-max",
+      "x-ai/grok-4*",
+      "qwen/qwen3*-max*",
       "google/gemini-*-pro"
     ]
   },
