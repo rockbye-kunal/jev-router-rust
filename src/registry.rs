@@ -198,7 +198,10 @@ impl Registry {
         age >= -60 && age <= max_age as i64
     }
     pub fn load(path: &std::path::Path) -> Result<Self> {
-        serde_json::from_slice(&std::fs::read(path).map_err(Error::internal)?)
+        // A missing cache is expected on first start; do not log it as an internal error.
+        let bytes = std::fs::read(path)
+            .map_err(|_| Error::new(503, "catalog_missing", "Cached catalog unavailable"))?;
+        serde_json::from_slice(&bytes)
             .map_err(|_| Error::new(503, "invalid_catalog", "Invalid cached catalog"))
     }
     pub async fn save(&self, path: &std::path::Path) -> Result<()> {

@@ -33,6 +33,10 @@ curl -fsS https://router.example.com/readyz
 
 Then test authenticated generation, streaming, tools, exclusions, missing/invalid keys, and two separate caller keys. Confirm each key can see only its own `/v1/usage` and `/v1/requests/{id}` results. Do not publish actual keys in commands, screenshots, logs or issue reports.
 
+Logs: `docker compose logs -f router` shows one JSON `request` line per call (request ID, status, model, effort) plus internal-error causes; no keys or content. Use `RUST_LOG` in the router service environment to change the level.
+
+Proxy timeouts: Caddy's response read timeout (260 s) and server write timeout (290 s) are set above the router's 240 s request deadline plus its 10 s admission margin. If you change `request_timeout_secs`, keep these proxy timeouts larger, or long non-stream generations will be cut at the edge while still billed upstream.
+
 ## Operations
 
 - **Single writer:** one router process per database. A lock prevents concurrent ownership. Do not increase replicas against this SQLite volume. Multi-node operation needs a distributed transactional backend and admission control.

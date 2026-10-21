@@ -32,12 +32,27 @@ impl Error {
         self.routing = Some(Box::new((id.into(), model.into(), effort.into())));
         self
     }
-    pub fn internal(_: impl std::fmt::Display) -> Self {
+    /// The cause is logged for operators but never returned to callers.
+    pub fn internal(cause: impl std::fmt::Display) -> Self {
+        tracing::error!(cause = %cause, "internal_error");
         Self::new(500, "internal_error", "Internal service error")
     }
 }
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
+        if self.status.is_server_error() {
+            tracing::warn!(
+                status = self.status.as_u16(),
+                code = self.code,
+                "error_response"
+            );
+        } else {
+            tracing::debug!(
+                status = self.status.as_u16(),
+                code = self.code,
+                "error_response"
+            );
+        }
         let mut response = (
             self.status,
             Json(json!({"error":{"code":self.code,"message":self.message,"request_id":self.routing.as_ref().map(|r|&r.0),"rate_limit_scope":self.rate_limit_scope,"retry_after_seconds":self.retry_after_secs}})),

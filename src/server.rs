@@ -149,6 +149,10 @@ pub fn app(s: AppState) -> Router {
         move |req: axum::extract::Request, next: axum::middleware::Next| {
             let body_admission = body_admission.clone();
             async move {
+                // Access-log fields only: no query string, headers, keys or bodies.
+                let method = req.method().clone();
+                let path = req.uri().path().chars().take(200).collect::<String>();
+                let received = std::time::Instant::now();
                 let admission = if req.method() == axum::http::Method::POST
                     && req.uri().path().starts_with("/v1/")
                 {
@@ -176,6 +180,26 @@ pub fn app(s: AppState) -> Router {
                 response.headers_mut().insert(
                     "x-content-type-options",
                     HeaderValue::from_static("nosniff"),
+                );
+                let header = |name: &str| {
+                    response
+                        .headers()
+                        .get(name)
+                        .and_then(|v| v.to_str().ok())
+                        .unwrap_or("")
+                        .to_owned()
+                };
+                // For streams this is time to response headers, not stream completion;
+                // completion and cost are in /v1/requests/{id}.
+                tracing::info!(
+                    method = %method,
+                    path = %path,
+                    status = response.status().as_u16(),
+                    request_id = %header("x-request-id"),
+                    model = %header("x-jev-model"),
+                    effort = %header("x-jev-effort"),
+                    header_ms = received.elapsed().as_millis() as u64,
+                    "request"
                 );
                 response
             }

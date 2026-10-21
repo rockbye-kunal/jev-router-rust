@@ -3,7 +3,9 @@
         timeouts {
             read_header 10s
             read_body 15s
-            write 170s
+            # Must exceed the router's 240 s request deadline plus its 10 s admission margin,
+            # otherwise long non-stream generations and streams are cut while still billed.
+            write 290s
             idle 2m
         }
         max_header_size 16KiB
@@ -16,7 +18,8 @@
     reverse_proxy router:8788 {
         flush_interval -1
         transport http {
-            read_timeout 135s
+            # A non-stream response sends no bytes until generation (and any repair) completes.
+            read_timeout 260s
             write_timeout 135s
         }
     }

@@ -107,6 +107,8 @@ An optional operator `advisor_model` enables at most one bounded expert consulta
 
 ## Observability and estimates
 
+The server writes JSON logs to stderr (stdout carries only command output and the `listening` event). Each HTTP request produces one `request` line with method, path (no query), status, `request_id`, selected model/effort and `header_ms` (time to response headers; for streams, completion is in the request record). Internal errors log their cause for operators while callers still receive a generic `internal_error`; 5xx responses also log their error code. Keys, prompts, answers and headers are never logged. Set the level with `RUST_LOG` (default `warn,jev_router=info`).
+
 Set `X-OpenRouter-Metadata: enabled` for routing metadata on JSON responses. All successful responses include `x-request-id`, `x-jev-model`, `x-jev-effort` and `x-jev-reason`. Streaming bytes are forwarded without protocol conversion or injected events; fetch `/v1/requests/{id}` for the decision record and settlement status. SSE frames are inspected incrementally, with a 1 MiB frame buffer cap, to collect reported usage and detect model changes/errors.
 
 The ledger distinguishes exact reported provider costs from conservative estimates. Input estimates use serialized request bytes plus overhead; reserve calculations include Jev and optional advice. Provider token-price ceilings are attached to generation requests. Multimodal fees, provider billing behavior and ambiguous failures mean local estimates are not contractual account spending caps. Configure upstream key/account guardrails for hard billing controls.
@@ -128,6 +130,13 @@ cargo test --locked
 cargo build --release --locked
 JEV_ROUTER_E2E_BIN="$PWD/target/release/jev-router" cargo test --locked --test process_e2e
 cargo audit
+```
+
+Or run the same sequence with one script; `--live` adds one real billed example (an unrestricted arithmetic request through a fresh server on port 18788 with a temporary database, then the audit record, usage counters and a clean SIGTERM stop):
+
+```sh
+scripts/local-integration.sh          # offline only, no paid calls
+scripts/local-integration.sh --live   # plus one billed OpenRouter example (needs OPENROUTER_API_KEY in .env)
 ```
 
 Tests use real local HTTP provider fixtures; they make no paid calls. The live smoke command uses the actual configured key and charges OpenRouter. See [VERIFICATION.md](VERIFICATION.md) for what was actually run. Integration success is not evidence that the independent policy matches the official router's quality or cost; evaluate representative tasks and calibrate thresholds before a client rollout.

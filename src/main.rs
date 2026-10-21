@@ -45,10 +45,22 @@ enum Command {
 }
 #[tokio::main]
 async fn main() {
+    init_logging();
     if let Err(e) = run().await {
         eprintln!("{}: {}", e.code, e.message);
         std::process::exit(1);
     }
+}
+/// JSON logs on stderr (stdout stays reserved for command output).
+/// Level is set with RUST_LOG, for example `RUST_LOG=jev_router=debug`; default `warn,jev_router=info`.
+fn init_logging() {
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("warn,jev_router=info"));
+    let _ = tracing_subscriber::fmt()
+        .json()
+        .with_env_filter(filter)
+        .with_writer(std::io::stderr)
+        .try_init();
 }
 async fn run() -> Result<()> {
     let cli = Cli::parse();
@@ -160,7 +172,7 @@ async fn serve(cfg: Config, key: Option<Credential>) -> Result<()> {
         loop {
             interval.tick().await;
             if let Err(e) = refresh_state.refresh().await {
-                eprintln!("catalog_refresh_failed:{}", e.code);
+                tracing::warn!(code = e.code, "catalog_refresh_failed");
             }
             let _ = refresh_state.store.prune().await;
         }
