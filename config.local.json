@@ -20,16 +20,34 @@
   "model_answer_review": false,
   "jev_model": "typesafe/jev-1.13",
   "advisor_model": null,
-  "hard_allowed_models": [],
-  "hard_excluded_models": [],
+  "hard_allowed_models": [
+    "openai/*",
+    "anthropic/*",
+    "google/gemini-*",
+    "amazon/nova-*",
+    "x-ai/*",
+    "deepseek/*",
+    "qwen/*"
+  ],
+  "hard_excluded_models": [
+    "openai/gpt-oss*",
+    "qwen/qwen-*",
+    "qwen/qwen2*",
+    "qwen/qwq*",
+    "deepseek/deepseek-r1*",
+    "deepseek/deepseek-chat*",
+    "deepseek/deepseek-v3*",
+    "deepseek/deepseek-prover*"
+  ],
   "pool_tiers": {
     "cheap": [
       "google/gemini-*-flash-lite*",
       "openai/gpt-5*-nano",
       "openai/gpt-4.1-nano",
       "amazon/nova-micro-v1",
-      "amazon/nova-lite-v1",
+      "qwen/qwen3*-flash*",
       "openai/gpt-4o-mini",
+      "amazon/nova-lite-v1",
       "x-ai/grok-*-fast*"
     ],
     "medium": [
@@ -38,7 +56,7 @@
       "openai/gpt-5.[0-9]-mini",
       "anthropic/claude-haiku-*",
       "deepseek/deepseek-v*-flash*",
-      "mistralai/mistral-small-3*",
+      "qwen/qwen3*-plus*",
       "openai/gpt-5-mini"
     ],
     "hard": [
