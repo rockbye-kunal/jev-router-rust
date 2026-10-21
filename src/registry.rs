@@ -36,6 +36,9 @@ pub struct Model {
     pub efforts: Vec<String>,
     pub control: String,
     pub canonical: String,
+    /// Catalog publication time (Unix seconds); 0 when unknown or from an older cache.
+    #[serde(default)]
+    pub created: i64,
 }
 impl Model {
     pub fn estimate(&self, input: u64, output: u64) -> f64 {
@@ -170,6 +173,7 @@ impl Registry {
                     efforts,
                     control: control.into(),
                     canonical,
+                    created: m["created"].as_i64().unwrap_or(0),
                 })
             })();
             if let Some(m) = parsed {

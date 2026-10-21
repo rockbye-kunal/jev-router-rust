@@ -45,6 +45,7 @@ fn model(id: &str) -> Model {
         efforts: vec!["low".into(), "medium".into(), "high".into()],
         control: "effort".into(),
         canonical: id.into(),
+        created: 0,
     }
 }
 fn registry() -> Registry {
@@ -2405,73 +2406,138 @@ async fn rate_limit_failover_uses_an_eligible_peer_under_an_operator_allowlist()
     );
 }
 
-fn priced(id: &str, price: f64) -> Model {
+fn priced(id: &str, price: f64, created: i64) -> Model {
     let mut m = model(id);
     m.input_price = price;
     m.output_price = price;
+    m.created = created;
     m
+}
+fn tiers(cheap: &[&str], medium: &[&str], hard: &[&str]) -> jev_router::config::PoolTiers {
+    let list = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+    jev_router::config::PoolTiers {
+        cheap: list(cheap),
+        medium: list(medium),
+        hard: list(hard),
+    }
+}
+fn plain_task(cfg: &Config) -> policy::Task {
+    policy::parse(
+        json!({"model":"auto","messages":[{"role":"user","content":"hi"}]}),
+        Protocol::Chat,
+        cfg,
+    )
+    .unwrap()
+}
+fn catalog(models: &[Model]) -> Registry {
+    Registry {
+        fetched_at: jev_router::config::now(),
+        models: models.to_vec(),
+        excluded: 0,
+        aliases: Default::default(),
+    }
 }
 #[test]
 fn tiered_pool_mixes_cheap_medium_and_hard_in_one_group() {
     let mut models = vec![
-        priced("a/cheap-1", 0.0000001),
-        priced("a/cheap-2", 0.0000001),
-        priced("a/cheap-2:free", 0.0),
-        priced("b/mid", 0.000001),
-        priced("c/fallback", 0.000003),
+        // Newest by catalog time wins, not the lexically greatest ID.
+        priced("a/cheap-1", 0.0000001, 30),
+        priced("a/cheap-2", 0.0000001, 20),
+        priced("a/cheap-1:free", 0.0, 40),
+        priced("b/mid", 0.000001, 1),
+        // A cheap "fast" variant matching the strong pattern must not fill the hard tier.
+        priced("c/strong-fast", 0.0000001, 99),
+        priced("c/strong-1", 0.00001, 5),
+        priced("d/fallback", 0.000003, 1),
     ];
     // A large unlisted catalog that must not all reach Jev.
     for i in 0..200 {
-        models.push(priced(
-            &format!("z/other-{i:03}"),
-            0.0000001 * (i + 1) as f64,
-        ));
+        models.push(priced(&format!("z/other-{i:03}"), 0.0000001, 1));
     }
-    let registry = Registry {
-        fetched_at: jev_router::config::now(),
-        models: models.clone(),
-        excluded: 0,
-        aliases: Default::default(),
-    };
+    let registry = catalog(&models);
     let cfg = Config {
-        pool_tiers: jev_router::config::PoolTiers {
-            cheap: vec!["a/cheap-*".into(), "missing/model".into()],
-            medium: vec!["b/mid".into()],
-            // No hard list: the most expensive unlisted eligible models backfill the tier.
-            hard: vec![],
-        },
-        fallback_model: "c/fallback".into(),
+        pool_tiers: tiers(&["a/cheap-*", "missing/model"], &["b/mid"], &["c/strong-*"]),
+        fallback_model: "d/fallback".into(),
         ..Config::default()
     };
     cfg.validate().unwrap();
-    let task = policy::parse(
-        json!({"model":"auto","messages":[{"role":"user","content":"hi"}]}),
-        Protocol::Chat,
-        &cfg,
-    )
-    .unwrap();
-    let (pool, tiers) = policy::tiered_pool(&task, &models, &registry, &cfg, None);
+    let task = plain_task(&cfg);
+    let (pool, labels) = policy::tiered_pool(&task, &models, &registry, &cfg, None);
     let ids = pool.iter().map(|m| m.id.as_str()).collect::<Vec<_>>();
-    // One model per pattern (newest ID), no variants, then medium, hard backfill, fallback.
+    assert_eq!(ids, ["a/cheap-1", "b/mid", "c/strong-1", "d/fallback"]);
+    assert_eq!(labels["a/cheap-1"], "cheap");
+    assert_eq!(labels["b/mid"], "medium");
+    assert_eq!(labels["c/strong-1"], "hard");
+    assert_eq!(labels["d/fallback"], "fallback");
+    assert!(pool.len() <= cfg.group_size, "must fit one Jev comparison");
+    // A session-bound model is always retained.
+    let (bound, labels) = policy::tiered_pool(&task, &models, &registry, &cfg, Some("z/other-050"));
+    assert!(bound.iter().any(|m| m.id == "z/other-050"));
+    assert_eq!(labels["z/other-050"], "session");
+    assert_eq!(
+        policy::stale_tier_patterns(&cfg, &registry),
+        [("cheap", "missing/model".to_string())]
+    );
+}
+#[test]
+fn empty_tiers_backfill_by_cost_percentile_without_specialist_models() {
+    let mut models = (0..10)
+        .map(|i| priced(&format!("z/other-{i:03}"), 0.0000001 * (i + 1) as f64, 1))
+        .collect::<Vec<_>>();
+    models.push(priced("z/deep-research-x", 0.001, 1));
+    models.push(priced("z/model-pro", 0.001, 1));
+    let registry = catalog(&models);
+    let cfg = Config {
+        pool_tiers: tiers(&["missing/model"], &[], &[]),
+        ..Config::default()
+    };
+    let task = plain_task(&cfg);
+    let (pool, labels) = policy::tiered_pool(&task, &models, &registry, &cfg, None);
+    let ids = pool.iter().map(|m| m.id.as_str()).collect::<Vec<_>>();
     assert_eq!(
         ids,
         [
-            "a/cheap-2",
-            "b/mid",
-            "z/other-199",
-            "z/other-198",
-            "c/fallback"
+            "z/other-001",
+            "z/other-002",
+            "z/other-006",
+            "z/other-005",
+            "z/other-008",
+            "z/other-007"
         ]
     );
-    assert_eq!(tiers["a/cheap-2"], "cheap");
-    assert_eq!(tiers["b/mid"], "medium");
-    assert_eq!(tiers["z/other-199"], "hard");
-    assert_eq!(tiers["c/fallback"], "fallback");
-    assert!(pool.len() <= cfg.group_size, "must fit one Jev comparison");
-    // A session-bound model is always retained.
-    let (bound, tiers) = policy::tiered_pool(&task, &models, &registry, &cfg, Some("z/other-050"));
-    assert!(bound.iter().any(|m| m.id == "z/other-050"));
-    assert_eq!(tiers["z/other-050"], "session");
+    assert_eq!(labels["z/other-001"], "cheap");
+    assert_eq!(labels["z/other-006"], "medium");
+    assert_eq!(labels["z/other-008"], "hard");
+}
+#[tokio::test]
+async fn tiered_pool_sends_tiers_to_jev_in_one_model_comparison() {
+    let s = setup(Config {
+        pool_tiers: tiers(&["vendor/cheap"], &["vendor/mid"], &["vendor/strong"]),
+        ..Config::default()
+    })
+    .await;
+    let r = send(&s, request(), "", "/v1/chat/completions").await;
+    assert_eq!(r.status(), 200);
+    let decisions = s.mock.decisions.lock().unwrap().clone();
+    let model_choices = decisions
+        .iter()
+        .filter(|d| {
+            d["questions"]["select"]["criteria"]
+                .as_object()
+                .is_some_and(|c| c.values().all(|v| v.get("effort").is_none()))
+        })
+        .collect::<Vec<_>>();
+    assert!(!model_choices.is_empty());
+    let first = model_choices[0]["questions"]["select"]["criteria"]
+        .as_object()
+        .unwrap();
+    let mut seen = first
+        .values()
+        .filter_map(|v| v["tier"].as_str())
+        .collect::<Vec<_>>();
+    seen.sort();
+    seen.dedup();
+    assert_eq!(seen, ["cheap", "hard", "medium"]);
 }
 #[test]
 fn tiered_pool_is_off_without_tiers_and_validates_cap() {

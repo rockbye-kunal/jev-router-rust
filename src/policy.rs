@@ -441,15 +441,20 @@ pub fn eligible(task: &Task, registry: &Registry, cfg: &Config) -> Result<(Vec<M
     }
     Ok((pool, ignored))
 }
+/// Model IDs never used to backfill a tier: slow agentic research, search-priced,
+/// image-generation and premium "pro" variants. Name them in a tier list to use them.
+const BACKFILL_SKIP: [&str; 5] = ["deep-research", "search", "-image", "-pro", "/o1"];
 /// Build the capped routing pool from operator tiers so one Jev comparison covers a
 /// cheap, a medium and a hard option. Order: cheap, medium, hard, then reserved models.
 ///
-/// Each tier takes up to `pool_per_tier` models, one per pattern (its newest matching
-/// ID). Variant IDs such as `:free` are skipped unless the pattern names a variant.
-/// A tier with no eligible listed model (for example under media or tool requirements)
-/// is backfilled with up to two unlisted eligible models by estimated cost: cheapest,
-/// middle or most expensive. The configured fallback, repair and recovery models and a
-/// session-bound model are always kept so recovery and session rules keep working.
+/// Each tier takes up to `pool_per_tier` models, one per pattern: the newest matching
+/// ID by catalog `created` time (then ID). Variant IDs such as `:free` are skipped
+/// unless the pattern names a variant. A hard pick must cost at least as much as the
+/// most expensive medium pick, so a cheap "fast" variant cannot fill the hard tier.
+/// A tier left empty for this request (stale patterns, media, tool or parameter
+/// requirements) is backfilled with up to two unlisted eligible models at the 10th,
+/// 50th or 85th cost percentile. The configured fallback, repair and recovery models
+/// and a session-bound model are always kept so recovery and session rules work.
 pub fn tiered_pool(
     task: &Task,
     eligible: &[Model],
@@ -457,9 +462,12 @@ pub fn tiered_pool(
     cfg: &Config,
     bound: Option<&str>,
 ) -> (Vec<Model>, std::collections::BTreeMap<String, String>) {
+    let cost = |m: &Model| m.estimate(task.input_bound, task.max_output);
     let mut chosen: Vec<Model> = Vec::new();
     let mut tiers = std::collections::BTreeMap::<String, String>::new();
+    let mut medium_max = 0.0_f64;
     for (tier, patterns) in cfg.pool_tiers.lists() {
+        let floor = if tier == "hard" { medium_max } else { 0.0 };
         let mut taken = 0;
         for p in patterns {
             if taken == cfg.pool_per_tier {
@@ -470,59 +478,59 @@ pub fn tiered_pool(
                 .filter(|m| {
                     !tiers.contains_key(&m.id)
                         && (p.contains(':') || !m.id.contains(':'))
+                        && cost(m) >= floor
                         && matches(p, m, registry)
                 })
-                .max_by(|a, b| a.id.cmp(&b.id));
+                .max_by(|a, b| a.created.cmp(&b.created).then_with(|| a.id.cmp(&b.id)));
             if let Some(m) = newest {
+                if tier == "medium" {
+                    medium_max = medium_max.max(cost(m));
+                }
                 tiers.insert(m.id.clone(), tier.to_owned());
                 chosen.push(m.clone());
                 taken += 1;
             }
         }
     }
-    let cost = |m: &Model| m.estimate(task.input_bound, task.max_output);
     let mut rest = eligible
         .iter()
-        .filter(|m| !tiers.contains_key(&m.id) && !m.id.contains(':'))
+        .filter(|m| {
+            !tiers.contains_key(&m.id)
+                && !m.id.contains(':')
+                && !BACKFILL_SKIP.iter().any(|s| m.id.contains(s))
+        })
         .collect::<Vec<_>>();
     rest.sort_by(|a, b| cost(a).total_cmp(&cost(b)).then_with(|| a.id.cmp(&b.id)));
     for (tier, _) in cfg.pool_tiers.lists() {
         if tiers.values().any(|t| t.as_str() == tier) {
             continue;
         }
+        let quantile = match tier {
+            "cheap" => 0.10,
+            "medium" => 0.50,
+            _ => 0.85,
+        };
         for _ in 0..cfg.pool_per_tier.min(2) {
-            let picked = match tier {
-                _ if rest.is_empty() => None,
-                "cheap" => Some(rest.remove(0)),
-                "hard" => rest.pop(),
-                _ => {
-                    let middle = rest.len() / 2;
-                    Some(rest.remove(middle))
-                }
-            };
-            let Some(m) = picked else { break };
+            if rest.is_empty() {
+                break;
+            }
+            let index = ((rest.len() - 1) as f64 * quantile).round() as usize;
+            let m = rest.remove(index);
             tiers.insert(m.id.clone(), tier.to_owned());
             chosen.push(m.clone());
         }
     }
-    for id in [
-        Some(cfg.fallback_model.as_str()),
-        Some(cfg.repair_model.as_str()),
-        Some(cfg.output_recovery_model.as_str()),
-        bound,
-    ]
-    .into_iter()
-    .flatten()
-    {
+    for (id, label) in [
+        (Some(cfg.fallback_model.as_str()), "fallback"),
+        (Some(cfg.repair_model.as_str()), "repair"),
+        (Some(cfg.output_recovery_model.as_str()), "recovery"),
+        (bound, "session"),
+    ] {
+        let Some(id) = id else { continue };
         if tiers.contains_key(id) {
             continue;
         }
         if let Some(m) = eligible.iter().find(|m| m.id == id) {
-            let label = if Some(id) == bound {
-                "session"
-            } else {
-                "fallback"
-            };
             tiers.insert(m.id.clone(), label.to_owned());
             chosen.push(m.clone());
         }
@@ -531,6 +539,21 @@ pub fn tiered_pool(
         return (eligible.to_vec(), std::collections::BTreeMap::new());
     }
     (chosen, tiers)
+}
+/// Tier patterns that match no catalog model (stale IDs after catalog changes).
+pub fn stale_tier_patterns(cfg: &Config, registry: &Registry) -> Vec<(&'static str, String)> {
+    cfg.pool_tiers
+        .lists()
+        .iter()
+        .flat_map(|(tier, patterns)| patterns.iter().map(move |p| (*tier, p.clone())))
+        .filter(|(_, p)| !registry.models.iter().any(|m| matches(p, m, registry)))
+        .collect()
+}
+/// Log stale tier patterns so a silently degraded pool is visible in production logs.
+pub fn warn_stale_tier_patterns(cfg: &Config, registry: &Registry) {
+    for (tier, pattern) in stale_tier_patterns(cfg, registry) {
+        tracing::warn!(tier, pattern = %pattern, "tier_pattern_matches_no_catalog_model");
+    }
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Selection {

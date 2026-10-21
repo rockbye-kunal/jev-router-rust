@@ -177,7 +177,7 @@ impl Config {
         // Three tiers plus fallback, repair, recovery and a session-bound model must
         // fit one comparison group, so tiered routing needs a single Jev model decision.
         if self.pool_tiers.enabled()
-            && (self.pool_per_tier == 0 || 3 * self.pool_per_tier + 4 > self.group_size)
+            && (self.pool_per_tier == 0 || self.pool_per_tier > self.group_size.saturating_sub(4) / 3)
         {
             return Err(Error::bad(
                 "pool_per_tier must be at least 1 and 3 * pool_per_tier + 4 must not exceed group_size",

@@ -52,7 +52,9 @@ live() {
       -e "s#\"database\": \"[^\"]*\"#\"database\": \"${work}/router.db\"#" \
       -e "s#\"catalog\": \"[^\"]*\"#\"catalog\": \"${work}/catalog.json\"#" \
       config.local.json >"$work/config.json"
-  grep -q "${work}/router.db" "$work/config.json" || fail "could not derive test config from config.local.json"
+  for expected in "127.0.0.1:${port}" "${work}/router.db" "${work}/catalog.json"; do
+    grep -q "\"${expected}\"" "$work/config.json" || fail "could not derive test config from config.local.json (${expected})"
+  done
 
   if curl -fsS "${base}/healthz" >/dev/null 2>&1; then fail "port ${port} already in use; stop that process or set JEV_IT_PORT"; fi
   step "Starting router on ${base} (logs: ${work}/server.log)"

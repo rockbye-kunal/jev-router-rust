@@ -123,6 +123,7 @@ impl AppState {
     }
     pub async fn refresh(&self) -> Result<()> {
         let registry = Registry::parse(&self.upstream.get("/api/v1/models", None).await?)?;
+        policy::warn_stale_tier_patterns(&self.cfg, &registry);
         registry.save(&self.cfg.catalog).await?;
         *self.registry.write().await = registry;
         Ok(())
@@ -581,9 +582,22 @@ async fn execute(
             .cloned()
             .collect::<Vec<_>>();
         if !next.is_empty() {
+            let rebuilt = if s.cfg.pool_tiers.enabled() {
+                let (capped, tiers) = policy::tiered_pool(
+                    &task,
+                    &next,
+                    &registry,
+                    &s.cfg,
+                    previous.as_ref().map(|p| p.0.as_str()),
+                );
+                task.tiers = tiers;
+                capped
+            } else {
+                next.clone()
+            };
             let (mut retry, new_model, _) = s
                 .engine
-                .select(&key, &task, &next, true, previous.as_ref())
+                .select(&key, &task, &rebuilt, true, previous.as_ref())
                 .await?;
             retry.jev_cost += selection.jev_cost;
             retry.jev_models.extend(selection.jev_models);
@@ -1375,6 +1389,7 @@ mod tests {
             efforts: efforts.iter().map(|e| e.to_string()).collect(),
             control: "effort".into(),
             canonical: "vendor/m".into(),
+            created: 0,
         }
     }
     #[test]

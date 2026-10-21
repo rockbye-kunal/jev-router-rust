@@ -154,17 +154,8 @@ fn pool_report(cfg: &Config, registry: &Registry) -> Result<Value> {
     )?;
     let (eligible, _) = jev_router::policy::eligible(&task, registry, cfg)?;
     let (pool, tiers) = jev_router::policy::tiered_pool(&task, &eligible, registry, cfg, None);
-    let unmatched = cfg
-        .pool_tiers
-        .lists()
-        .iter()
-        .flat_map(|(tier, patterns)| patterns.iter().map(move |p| (*tier, p)))
-        .filter(|(_, p)| {
-            !registry
-                .models
-                .iter()
-                .any(|m| jev_router::policy::matches(p, m, registry))
-        })
+    let unmatched = jev_router::policy::stale_tier_patterns(cfg, registry)
+        .into_iter()
         .map(|(tier, p)| json!({"tier":tier,"pattern":p}))
         .collect::<Vec<_>>();
     Ok(json!({
@@ -205,6 +196,7 @@ async fn serve(cfg: Config, key: Option<Credential>) -> Result<()> {
             r
         }
     };
+    jev_router::policy::warn_stale_tier_patterns(&cfg, &registry);
     let store = Arc::new(Store::open(&cfg.database).await?);
     store.recover().await?;
     store.prune().await?;
