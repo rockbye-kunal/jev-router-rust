@@ -25,7 +25,7 @@ The follow-up complex optimization quality check **failed**, despite successful 
 
 The current rerun used the loopback service on port 8788. The earlier public-mode acceptance server was temporarily bound on port 8789. Missing caller credentials were rejected, and readiness reported public BYOK mode. The normalized live registry contained 347 models before task, capability, restriction and budget filtering. The suite uses five-second spacing between cases; this is not a production load benchmark. An earlier unpaced run encountered an upstream 429, and that failure is not counted as a pass. Rate-limit errors now distinguish routing from generation, and ambiguous generation is never automatically replayed.
 
-Actual live data: [AUTO-ROUTING-RESULTS.json](AUTO-ROUTING-RESULTS.json). Executable checks: [RELEASE-E2E-RESULTS.txt](RELEASE-E2E-RESULTS.txt). All automated checks: [TEST-RESULTS.txt](TEST-RESULTS.txt).
+Actual live data: [AUTO-ROUTING-RESULTS.json](AUTO-ROUTING-RESULTS.json). Automated and executable checks now run in CI on every push.
 
 ## Executable scenario
 

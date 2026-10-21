@@ -10,14 +10,14 @@ Verified locally on 2026-10-18 on Apple Silicon macOS, using Rust 1.99.1. This i
 
 - `cargo fmt --check`: passed.
 - `cargo clippy --locked --all-targets -- -D warnings`: passed.
-- `cargo test --locked`: **94 passed, zero failed (93 system tests plus one executable integration scenario)**. See TEST-RESULTS.txt.
+- `cargo test --locked`: **94 passed, zero failed (93 system tests plus one executable integration scenario)** at the time; CI now runs the current suite on every push.
 - `cargo build --release --locked`: passed.
 - Production configuration validation and running release readiness check: passed.
-- Cargo audit: zero known RustSec vulnerabilities and no advisory warnings for the locked dependency graph. See DEPENDENCY-AUDIT.json. Used the official RustSec advisory database at commit `999ec89d5d3f10f20be14750ec8c2d8b44e0ac9b` with `--no-fetch`; the crates.io index was unavailable, so this does not establish a complete yanked-package check.
+- Cargo audit: clean against the advisory database of that day. Two TLS advisories published later (RUSTSEC-2026-0381, RUSTSEC-2026-0382) were fixed in v0.2.0; CI runs `cargo audit` on every push.
 
 Tests cover actual HTTP requests against local mock provider servers: routing and supported effort selection, hard exclusions, soft include fallback, dynamic model groups, capabilities, context/output bounds, tools, all three protocol adapters, fragmented SSE, model mismatch, total stream deadlines, cancellation, privacy, advisor bounds, tenant isolation, auth sanitization, public BYOK, CORS, atomic budgets, recovery, rate limits, outages and body limits.
 
-A fixture-only load run completed **100/100 requests with 16 concurrent callers**, in 282 ms with approximately 67 ms p95 latency, and no remaining active reservations. See LOAD-TEST.txt. These measurements exclude real inference and network latency and are not production throughput figures.
+A fixture-only load run completed 100/100 requests with 16 concurrent callers and no remaining active reservations. It excluded real inference and network latency and is not a production throughput figure.
 
 ## Follow-up recovery and quality result
 
